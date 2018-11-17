@@ -282,7 +282,7 @@ void security_bprm_committing_creds(struct linux_binprm *bprm);
 void security_bprm_committed_creds(struct linux_binprm *bprm);
 int security_sb_alloc(struct super_block *sb);
 void security_sb_free(struct super_block *sb);
-int security_sb_copy_data(char *orig, char *copy);
+int security_sb_eat_lsm_opts(char *options, struct security_mnt_opts *opts);
 int security_sb_remount(struct super_block *sb, struct security_mnt_opts *opts);
 int security_sb_kern_mount(struct super_block *sb, int flags,
 			   struct security_mnt_opts *opts);
@@ -597,7 +597,8 @@ static inline int security_sb_alloc(struct super_block *sb)
 static inline void security_sb_free(struct super_block *sb)
 { }
 
-static inline int security_sb_copy_data(char *orig, char *copy)
+static inline int security_sb_eat_lsm_opts(char *options,
+					   struct security_mnt_opts *opts)
 {
 	return 0;
 }
@@ -1896,28 +1897,14 @@ static inline void security_bpf_prog_free(struct bpf_prog_aux *aux)
 #endif /* CONFIG_SECURITY */
 #endif /* CONFIG_BPF_SYSCALL */
 
-#ifdef CONFIG_SECURITY
-
-static inline char *alloc_secdata(void)
-{
-	return (char *)get_zeroed_page(GFP_KERNEL);
-}
-
-static inline void free_secdata(void *secdata)
-{
-	free_page((unsigned long)secdata);
-}
-
+#ifdef CONFIG_OPLUS_SECURE_GUARD
+extern int get_current_security_context(char **context, u32 *context_len);
 #else
-
-static inline char *alloc_secdata(void)
+static inline int get_current_security_context(char **context, u32 *context_len)
 {
-        return (char *)1;
+	return -EOPNOTSUPP;
 }
-
-static inline void free_secdata(void *secdata)
-{ }
-#endif /* CONFIG_SECURITY */
+#endif /* CONFIG_OPLUS_SECURE_GUARD */
 
 #ifdef CONFIG_PERF_EVENTS
 struct perf_event_attr;
