@@ -2219,6 +2219,15 @@ config ASN1
 
 source "kernel/Kconfig.locks"
 
+config OPLUS_FEATURE_EAS_IGNORE_CACHEMISS
+	bool "EAS: ignore cachemiss"
+	default n
+	help
+	  EAS: change function "find_energy_efficient_cpu" as kernel-4.14, ignore cachemiss
+
+config ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE
+	bool
+
 config ARCH_HAS_SYNC_CORE_BEFORE_USERMODE
 	bool
 
