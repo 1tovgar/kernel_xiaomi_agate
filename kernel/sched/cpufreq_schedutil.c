@@ -178,8 +178,11 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	sg_policy->cached_raw_freq = freq;
 	return cpufreq_driver_resolve_freq(policy, freq);
 }
+#endif
+
 extern long
 schedtune_cpu_margin_with(unsigned long util, int cpu, struct task_struct *p);
+
 /*
  * This function computes an effective utilization for the given CPU, to be
  * used for frequency selection given the linear relation: f = u * f_max.
