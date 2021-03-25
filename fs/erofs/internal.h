@@ -365,8 +365,6 @@ static inline int z_erofs_map_blocks_iter(struct inode *inode,
 /* data.c */
 struct page *erofs_get_meta_page(struct super_block *sb, erofs_blk_t blkaddr);
 
-int erofs_map_blocks(struct inode *, struct erofs_map_blocks *, int);
-
 /* inode.c */
 static inline unsigned long erofs_inode_hash(erofs_nid_t nid)
 {

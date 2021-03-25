@@ -106,45 +106,6 @@ err_out:
 	return err;
 }
 
-int erofs_map_blocks(struct inode *inode,
-		     struct erofs_map_blocks *map, int flags)
-{
-	if (erofs_inode_is_data_compressed(EROFS_I(inode)->datalayout)) {
-		int err = z_erofs_map_blocks_iter(inode, map, flags);
-
-		if (map->mpage) {
-			put_page(map->mpage);
-			map->mpage = NULL;
-		}
-		return err;
-	}
-	/* parse chunk indexes */
-	idx = page_address(page) + erofs_blkoff(pos);
-	switch (le32_to_cpu(idx->blkaddr)) {
-	case EROFS_NULL_ADDR:
-		map->m_flags = 0;
-		break;
-	default:
-		/* only one device is supported for now */
-		if (idx->device_id) {
-			erofs_err(sb, "invalid device id %u @ %llu for nid %llu",
-				  le16_to_cpu(idx->device_id),
-				  chunknr, vi->nid);
-			err = -EFSCORRUPTED;
-			goto out_unlock;
-		}
-		map->m_pa = blknr_to_addr(le32_to_cpu(idx->blkaddr));
-		map->m_flags = EROFS_MAP_MAPPED;
-		break;
-	}
-out_unlock:
-	unlock_page(page);
-	put_page(page);
-out:
-	map->m_llen = map->m_plen;
-	return err;
-}
-
 static inline struct bio *erofs_read_raw_page(struct bio *bio,
 					      struct address_space *mapping,
 					      struct page *page,
@@ -180,7 +141,7 @@ submit_bio_retry:
 		erofs_blk_t blknr;
 		unsigned int blkoff;
 
-		err = erofs_map_blocks(inode, &map, EROFS_GET_BLOCKS_RAW);
+		err = erofs_map_blocks_flatmode(inode, &map, EROFS_GET_BLOCKS_RAW);
 		if (err)
 			goto err_out;
 
@@ -358,8 +319,8 @@ static sector_t erofs_bmap(struct address_space *mapping, sector_t block)
 			return 0;
 	}
 
-	if (!erofs_map_blocks(inode, &map, EROFS_GET_BLOCKS_RAW))
 
+	if (!erofs_map_blocks_flatmode(inode, &map, EROFS_GET_BLOCKS_RAW))
 		return erofs_blknr(map.m_pa);
 
 	return 0;
