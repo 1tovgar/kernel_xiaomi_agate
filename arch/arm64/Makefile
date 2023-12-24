@@ -138,6 +138,11 @@ MTK_PLATFORM := $(CONFIG_MTK_PLATFORM:"%"=%)
 MTK_PROJECT := $(CONFIG_ARCH_MTK_PROJECT:"%"=%)
 export MTK_PLATFORM MTK_PROJECT
 
+KBUILD_DTBO_IMG := dtbo.img
+
+ifeq ($(CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE),y)
+export DTC_FLAGS := -@
+endif
 
 Image: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
@@ -161,6 +166,19 @@ dtbs: prepare scripts
 
 dtbs_install:
 	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts
+
+Image-dtb: vmlinux scripts dtbs
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+
+Image.gz-dtb: vmlinux scripts dtbs Image.gz
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+
+ifeq ($(CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE),y)
+$(KBUILD_DTBO_IMG): dtbs
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+
+all: $(KBUILD_DTBO_IMG)
+endif
 
 PHONY += vdso_install
 vdso_install:
