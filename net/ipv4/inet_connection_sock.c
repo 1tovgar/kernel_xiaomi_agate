@@ -717,6 +717,9 @@ static bool __inet_csk_reqsk_queue_drop(struct sock *sk,
 {
 	bool unlinked = reqsk_queue_unlink(&inet_csk(sk)->icsk_accept_queue, req);
 
+	if (!from_timer && del_timer_sync(&req->rsk_timer))
+		reqsk_put(req);
+
 	if (unlinked) {
 		reqsk_queue_removed(&inet_csk(sk)->icsk_accept_queue, req);
 		reqsk_put(req);
