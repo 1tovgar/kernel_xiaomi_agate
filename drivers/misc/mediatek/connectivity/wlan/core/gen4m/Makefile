@@ -436,22 +436,7 @@ ifeq ($(CONFIG_MTK_COMBO_WIFI),y)
     ccflags-y += -DCFG_WPS_DISCONNECT=1
 endif
 
-ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), sdio)
-    ccflags-y += -D_HIF_SDIO=1
-else ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), pcie)
-    ccflags-y += -D_HIF_PCIE=1
-else ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), usb)
-    ccflags-y += -D_HIF_USB=1
-else ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), axi)
-    ccflags-y += -D_HIF_AXI=1
-else ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), ut)
-    # Increase frame size to 2048 because of 'cfg80211_connect_result' exceed stack size
-    ccflags-y += -D_HIF_UT=1 -Wno-unused-function -Wno-unused-variable -Wframe-larger-than=2048
-else ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), none)
-	ccflags-y += -D_HIF_NONE=1
-else
-    $(error Unsuppoted HIF=$(CONFIG_MTK_COMBO_WIFI_HIF)!!)
-endif
+ccflags-y += -D_HIF_AXI=1
 
 ifeq ($(CONFIG_MTK_WIFI_DOWNLOAD_DYN_MEMORY_MAP), y)
     ccflags-y += -DCFG_DOWNLOAD_DYN_MEMORY_MAP=1
