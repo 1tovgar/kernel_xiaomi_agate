@@ -1717,81 +1717,7 @@ const struct file_operations proc_pagemap_operations = {
 #endif /* CONFIG_PROC_PAGE_MONITOR */
 
 #ifdef CONFIG_PROCESS_RECLAIM
-#define FOREGROUND_APP_ADJ 0
-#define CACHED_APP_MIN_ADJ 900
-static bool running_state = true;
-static inline bool can_reclaim(short before_reclaim_adj, struct mm_struct *mm, struct task_struct *task)
-{
-	short cur_oom_score_adj;
-	if (false == running_state || fatal_signal_pending(task) || task->flags & PF_EXITING ||
-			!list_empty(&mm->mmap_sem.wait_list)) {
-		pr_info("stop reclaim: force\n");
-		return false;
-	}
-	cur_oom_score_adj = task->signal->oom_score_adj;
-	if ((cur_oom_score_adj < CACHED_APP_MIN_ADJ &&
-			cur_oom_score_adj < before_reclaim_adj) ||
-			FOREGROUND_APP_ADJ == cur_oom_score_adj) {
-		pr_info("[c:%s %d, r:%s %d] adj adjust %d %d\n",
-			current->comm, current->pid,
-			task->comm, task->pid,
-			before_reclaim_adj, cur_oom_score_adj);
-		return false;
-	}
-	return true;
-}
-
-static int deactivate_pte_range(pmd_t *pmd, unsigned long addr,
-				unsigned long end, struct mm_walk *walk)
-{
-	struct vm_area_struct *vma = walk->private;
-	pte_t *pte, ptent;
-	spinlock_t *ptl;
-	struct page *page;
-
-	pte = pte_offset_map_lock(vma->vm_mm, pmd, addr, &ptl);
-	for (; addr < end; pte++, addr += PAGE_SIZE) {
-		ptent = *pte;
-
-		if (pte_none(ptent))
-			continue;
-
-		if (!pte_present(ptent))
-			continue;
-
-		page = vm_normal_page(vma, addr, ptent);
-		if (!page)
-			continue;
-		/*
-		 * XXX: we don't handle compound page at this moment but
-		 * it should revisit for THP page before upstream.
-		 */
-		if (PageCompound(page)) {
-			unsigned int order = compound_order(page);
-			unsigned int nr_pages = (1 << order) - 1;
-
-			addr += (nr_pages * PAGE_SIZE);
-			pte += nr_pages;
-			continue;
-		}
-
-		if (page_mapcount(page) > 1)
-			continue;
-
-		ptep_test_and_clear_young(vma, addr, pte);
-		test_and_clear_page_young(page);
-		if (PageReferenced(page))
-			ClearPageReferenced(page);
-		if (PageActive(page))
-			deactivate_file_page(page);
-	}
-	pte_unmap_unlock(pte - 1, ptl);
-
-	cond_resched();
-	return 0;
-}
-
-int reclaim_pte_range(pmd_t *pmd, unsigned long addr,
+static int reclaim_pte_range(pmd_t *pmd, unsigned long addr,
 				unsigned long end, struct mm_walk *walk)
 {
 	struct vm_area_struct *vma = walk->private;
@@ -1903,11 +1829,6 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 				continue;
 			if (type == RECLAIM_FILE && !vma->vm_file)
 				continue;
-
-			if (!vma->vm_file)
-				reclaim_walk.pmd_entry = reclaim_pte_range;
-			else
-				reclaim_walk.pmd_entry = deactivate_pte_range;
 
 			walk_page_range(vma->vm_start, vma->vm_end,
 					&reclaim_walk);
