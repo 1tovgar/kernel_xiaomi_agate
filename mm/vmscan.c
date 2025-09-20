@@ -1132,7 +1132,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		struct address_space *mapping;
 		struct page *page;
 		int may_enter_fs;
-		enum page_references references = PAGEREF_RECLAIM;
+		enum page_references references = PAGEREF_RECLAIM_CLEAN;
 		bool dirty, writeback;
 
 		cond_resched();
@@ -1527,8 +1527,6 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 		.gfp_mask = GFP_KERNEL,
 		.priority = DEF_PRIORITY,
 		.may_unmap = 1,
-		/* Doesn't allow to write out dirty page */
-		.may_writepage = 0,
 	};
 	unsigned long ret;
 	struct page *page, *next;
@@ -1549,21 +1547,23 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 	return ret;
 }
 
-#ifdef CONFIG_PROCESS_RECLAIM
-unsigned long reclaim_pages_from_list(struct list_head *page_list)
+#if defined(CONFIG_NANDSWAP)
+unsigned long nswap_reclaim_page_list(struct list_head *page_list,
+					struct vm_area_struct *vma, bool scan)
 {
 	unsigned long nr_isolated[2] = {0, };
 	struct pglist_data *pgdat = NULL;
+	unsigned long nr_reclaimed;
+	unsigned long nr_scan = 0;
+	struct page *page;
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
 		.priority = DEF_PRIORITY,
 		.may_writepage = 1,
 		.may_unmap = 1,
 		.may_swap = 1,
+		.target_vma = vma,
 	};
-
-	unsigned long nr_reclaimed;
-	struct page *page;
 
 	if (list_empty(page_list))
 		return 0;
@@ -1583,11 +1583,13 @@ unsigned long reclaim_pages_from_list(struct list_head *page_list)
 	mod_node_page_state(pgdat, NR_ISOLATED_ANON, nr_isolated[0]);
 	mod_node_page_state(pgdat, NR_ISOLATED_FILE, nr_isolated[1]);
 
-	nr_reclaimed = shrink_page_list(page_list, pgdat, &sc,
+	nr_reclaimed = shrink_page_list(page_list, NULL, &sc,
 			TTU_IGNORE_ACCESS, NULL, true);
 
 	while (!list_empty(page_list)) {
 		page = lru_to_page(page_list);
+		if (PageSwapCache(page) && !PageDirty(page))
+			nr_scan++;
 		list_del(&page->lru);
 		putback_lru_page(page);
 	}
@@ -1595,7 +1597,7 @@ unsigned long reclaim_pages_from_list(struct list_head *page_list)
 	mod_node_page_state(pgdat, NR_ISOLATED_ANON, -nr_isolated[0]);
 	mod_node_page_state(pgdat, NR_ISOLATED_FILE, -nr_isolated[1]);
 
-	return nr_reclaimed;
+	return scan ? nr_scan : nr_reclaimed;
 }
 #endif
 
