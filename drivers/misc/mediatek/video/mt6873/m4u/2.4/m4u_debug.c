@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (c) 2020 MediaTek Inc.
+ * Copyright (c) 2019 MediaTek Inc.
  */
 
 #include <linux/vmalloc.h>
@@ -19,7 +19,7 @@
 #include "trustzone/kree/mem.h"
 #endif
 
-#ifdef CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM
+#if defined(CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM)
 #include "trusted_mem_api.h"
 #endif
 
@@ -27,16 +27,13 @@
 int gM4U_log_to_uart = 2;
 int gM4U_log_level = 2;
 
-#if IS_ENABLED(CONFIG_DEBUG_FS) || IS_ENABLED(CONFIG_PROC_FS)
-int m4u_test_domain;
-
 unsigned int gM4U_seed_mva;
 
 int m4u_test_alloc_dealloc(int id, unsigned int size)
 {
 	struct m4u_client_t *client;
 	unsigned long va = 0;
-	unsigned int mva = 0;
+	unsigned int mva;
 	int ret;
 	unsigned long populate;
 
@@ -47,9 +44,8 @@ int m4u_test_alloc_dealloc(int id, unsigned int size)
 	else if (id == 3) {
 		mmap_write_lock(current->mm);
 		va = do_mmap_pgoff(NULL, 0, size,
-				PROT_READ | PROT_WRITE,
-				MAP_SHARED | MAP_LOCKED,
-				0, &populate, NULL);
+			PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED,
+			0, &populate, NULL);
 		mmap_write_unlock(current->mm);
 	}
 
@@ -62,7 +58,8 @@ int m4u_test_alloc_dealloc(int id, unsigned int size)
 	ret = m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, va, NULL, size,
 			    M4U_PROT_READ | M4U_PROT_CACHE, 0, &mva);
 	if (ret) {
-		M4UMSG("alloc mva fail:va=0x%lx,size=0x%x,ret=%d\n",
+		M4UMSG(
+			"alloc mva fail:va=0x%lx,size=0x%x,ret=%d\n",
 			va, size, ret);
 		return -1;
 	}
@@ -92,11 +89,13 @@ enum m4u_callback_ret_t m4u_test_callback(int alloc_port, unsigned int mva,
 				     unsigned int size, void *data)
 {
 	if (data != NULL)
-		M4UMSG("test callback port=%d,mva=0x%x,size=0x%x,data=0x%x\n",
-			alloc_port, mva, size, *(int *)data);
+		M4UMSG(
+		"test callback port=%d, mva=0x%x, size=0x%x, data=0x%x\n",
+		alloc_port, mva, size, *(int *)data);
 	else
-		M4UMSG("test callback port=%d, mva=0x%x, size=0x%x\n",
-			alloc_port, mva, size);
+		M4UMSG(
+		"test callback port=%d, mva=0x%x, size=0x%x\n",
+		alloc_port, mva, size);
 
 	return M4U_CALLBACK_HANDLED;
 }
@@ -106,7 +105,7 @@ int m4u_test_reclaim(unsigned int size)
 	struct m4u_client_t *client;
 	unsigned int *va[10];
 	unsigned int buf_size;
-	unsigned int mva = 0;
+	unsigned int mva;
 	int ret, i;
 
 	/* register callback */
@@ -122,15 +121,17 @@ int m4u_test_reclaim(unsigned int size)
 		va[i] = vmalloc(buf_size);
 
 		ret = m4u_alloc_mva(client,
-			M4U_PORT_DISP_OVL0, (unsigned long)va[i],
+				M4U_PORT_DISP_OVL0, (unsigned long)va[i],
 				NULL, buf_size,
 				M4U_PROT_READ | M4U_PROT_CACHE, 0, &mva);
 		if (ret) {
-			M4UMSG("alloc using kmalloc fail:va=0x%p,size=0x%x\n",
+			M4UMSG(
+				"alloc using kmalloc fail:va=0x%p,size=0x%x\n",
 				va[i], buf_size);
 			return -1;
 		}
-		M4UINFO("alloc mva:va=0x%p,mva=0x%x,size=0x%x\n",
+		M4UINFO(
+			"alloc mva:va=0x%p,mva=0x%x,size=0x%x\n",
 			va[i], mva, buf_size);
 
 		buf_size += size;
@@ -139,7 +140,7 @@ int m4u_test_reclaim(unsigned int size)
 	for (i = 0; i < 10; i++)
 		vfree((void *)va[i]);
 
-	m4u_dump_buf_info(NULL, m4u_test_domain);
+	m4u_dump_buf_info(NULL);
 	m4u_dump_pgtable(m4u_get_domain_by_port(M4U_PORT_DISP_OVL0), NULL);
 
 	m4u_destroy_client(client);
@@ -154,18 +155,17 @@ static int m4u_test_map_kernel(void)
 	struct m4u_client_t *client;
 	unsigned long va;
 	unsigned int size = 1024 * 1024;
-	unsigned int mva = 0;
-	unsigned long kernel_va = 0;
-	unsigned int kernel_size = 0;
+	unsigned int mva;
+	unsigned long kernel_va;
+	unsigned int kernel_size;
 	int i;
 	int ret;
 	unsigned long populate;
 
 	mmap_write_lock(current->mm);
 	va = do_mmap_pgoff(NULL, 0, size,
-			PROT_READ | PROT_WRITE,
-			MAP_SHARED | MAP_LOCKED,
-			0, &populate, NULL);
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED,
+		0, &populate, NULL);
 	mmap_write_unlock(current->mm);
 
 	M4UINFO("test va=0x%lx,size=0x%x\n", va, size);
@@ -177,11 +177,11 @@ static int m4u_test_map_kernel(void)
 	if (IS_ERR_OR_NULL(client))
 		M4UMSG("createclientfail!\n");
 
-	ret = m4u_alloc_mva(client, M4U_PORT_DISP_OVL0,
-		va, NULL, size, M4U_PROT_READ | M4U_PROT_CACHE,
-		0, &mva);
+	ret = m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, va, NULL, size,
+		M4U_PROT_READ | M4U_PROT_CACHE, 0, &mva);
 	if (ret) {
-		M4UMSG("alloc using kmalloc fail:va=0x%lx,size=0x%x\n",
+		M4UMSG(
+			"alloc using kmalloc fail:va=0x%lx,size=0x%x\n",
 			va, size);
 		return -1;
 	}
@@ -213,10 +213,8 @@ static int m4u_test_map_kernel(void)
 
 int m4u_test_ddp(unsigned int prot)
 {
-	unsigned int *pSrc = NULL;
-	unsigned int *pDst = NULL;
-	unsigned int src_pa = 0;
-	unsigned int dst_pa = 0;
+	unsigned int *pSrc, *pDst;
+	unsigned int src_pa, dst_pa;
 	unsigned int size = 64 * 64 * 3;
 	struct M4U_PORT_STRUCT port;
 	struct m4u_client_t *client = m4u_create_client();
@@ -230,7 +228,8 @@ int m4u_test_ddp(unsigned int prot)
 	m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pDst, NULL,
 		      size, prot, 0, &dst_pa);
 
-	M4UINFO("pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n",
+	M4UINFO(
+		"pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n",
 		pSrc, pDst, src_pa, dst_pa);
 
 	port.ePortID = M4U_PORT_DISP_OVL0;
@@ -255,11 +254,12 @@ int m4u_test_ddp(unsigned int prot)
 	return 0;
 }
 
-enum m4u_callback_ret_t test_fault_callback(int port,
-		unsigned int mva, void *data)
+enum m4u_callback_ret_t test_fault_callback(
+	int port, unsigned int mva, void *data)
 {
 	if (data != NULL)
-		M4UMSG("fault call port=%d, mva=0x%x, data=0x%x\n",
+		M4UMSG(
+			"fault call port=%d, mva=0x%x, data=0x%x\n",
 			port, mva, *(int *)data);
 	else
 		M4UMSG("fault call port=%d, mva=0x%x\n", port, mva);
@@ -273,10 +273,8 @@ enum m4u_callback_ret_t test_fault_callback(int port,
 
 int m4u_test_tf(unsigned int prot)
 {
-	unsigned int *pSrc = NULL;
-	unsigned int *pDst = NULL;
-	unsigned int src_pa = 0;
-	unsigned int dst_pa = 0;
+	unsigned int *pSrc, *pDst;
+	unsigned int src_pa, dst_pa;
 	unsigned int size = 64 * 64 * 3;
 	struct M4U_PORT_STRUCT port;
 	struct m4u_client_t *client = m4u_create_client();
@@ -296,7 +294,8 @@ int m4u_test_tf(unsigned int prot)
 	m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pDst, NULL,
 		      size / 2, prot, 0, &dst_pa);
 
-	M4UINFO("pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n",
+	M4UINFO(
+		"pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n",
 		pSrc, pDst, src_pa, dst_pa);
 
 	port.ePortID = M4U_PORT_DISP_OVL0;
@@ -325,7 +324,7 @@ int m4u_test_tf(unsigned int prot)
 	return 0;
 }
 
-#ifdef M4U_FPGAPORTING
+#if 0
 #include <mtk/ion_drv.h>
 
 void m4u_test_ion(void)
@@ -333,7 +332,7 @@ void m4u_test_ion(void)
 	unsigned int *pSrc, *pDst;
 	unsigned long src_pa, dst_pa;
 	unsigned int size = 64 * 64 * 3, tmp_size;
-	struct M4U_PORT_STRUCT port;
+	M4U_PORT_STRUCT port;
 	struct ion_mm_data mm_data;
 	struct ion_client *ion_client;
 	struct ion_handle *src_handle, *dst_handle;
@@ -367,7 +366,7 @@ void m4u_test_ion(void)
 	ion_phys(ion_client, src_handle, &src_pa, (size_t *)&tmp_size);
 	ion_phys(ion_client, dst_handle, &dst_pa, (size_t *)&tmp_size);
 
-	M4UMSG("ion alloced: pSrc=0x%p, pDst=0x%p, src_pa=%lu, dst_pa=%lu\n",
+	M4UMSG("ion alloced: pSrc=0x%p,	pDst=0x%p, src_pa=%lu, dst_pa=%lu\n",
 		pSrc, pDst, src_pa, dst_pa);
 
 	port.ePortID = M4U_PORT_DISP_OVL0;
@@ -396,28 +395,23 @@ void m4u_test_ion(void)
 
 static int m4u_debug_set(void *data, u64 val)
 {
-	struct m4u_domain_t *domain = data;
+	struct m4u_domain *domain = data;
 
 	M4UMSG("%s:val=%llu\n", __func__, val);
 
 	switch (val) {
 	case 1:
-	{       /* map 4k page only */
+	{                   /* map4kpageonly */
 		struct sg_table table;
 		struct sg_table *sg_table = &table;
 		struct scatterlist *sg;
-		int i, ret;
+		int i;
 		struct page *page;
 		int page_num = 512;
 		unsigned int mva = 0x4000;
 
 		page = alloc_pages(GFP_KERNEL, get_order(page_num));
-		ret = sg_alloc_table(sg_table, page_num, GFP_KERNEL);
-		if (ret) {
-			m4u_info("%s alloc_sgtable fail, ret:%d\n",
-				 __func__, ret);
-			return -ENOMEM;
-		}
+		sg_alloc_table(sg_table, page_num, GFP_KERNEL);
 		for_each_sg(sg_table->sgl, sg, sg_table->nents, i)
 			sg_set_page(sg, page + i, PAGE_SIZE, 0);
 		m4u_map_sgtable(domain, mva,
@@ -432,29 +426,23 @@ static int m4u_debug_set(void *data, u64 val)
 	}
 	break;
 	case 2:
-	{       /* map 64k page only */
+	{                   /* map64kpageonly */
 		struct sg_table table;
 		struct sg_table *sg_table = &table;
 		struct scatterlist *sg;
-		int i, ret;
+		int i;
 		int page_num = 51;
 		unsigned int page_size = SZ_64K;
 		unsigned int mva = SZ_64K;
 
-		ret = sg_alloc_table(sg_table, page_num, GFP_KERNEL);
-		if (ret) {
-			m4u_info("%s alloc_sgtable fail, ret:%d\n",
-				 __func__, ret);
-			return -ENOMEM;
-		}
+		sg_alloc_table(sg_table, page_num, GFP_KERNEL);
 		for_each_sg(sg_table->sgl, sg, sg_table->nents, i) {
 			sg_dma_address(sg) = page_size * (i + 1);
 			sg_dma_len(sg) = page_size;
 		}
 
-		m4u_map_sgtable(domain, mva,
-			sg_table, page_num * page_size,
-			M4U_PROT_WRITE | M4U_PROT_READ);
+		m4u_map_sgtable(domain, mva, sg_table,
+			page_num * page_size, M4U_PROT_WRITE | M4U_PROT_READ);
 		m4u_dump_pgtable(domain, NULL);
 		m4u_unmap(domain, mva, page_num * page_size);
 		m4u_dump_pgtable(domain, NULL);
@@ -462,28 +450,23 @@ static int m4u_debug_set(void *data, u64 val)
 	}
 	break;
 	case 3:
-	{       /* map 1M page only */
+	{                   /* map1Mpageonly */
 		struct sg_table table;
 		struct sg_table *sg_table = &table;
 		struct scatterlist *sg;
-		int i, ret;
+		int i;
 		int page_num = 37;
 		unsigned int page_size = SZ_1M;
 		unsigned int mva = SZ_1M;
 
-		ret = sg_alloc_table(sg_table, page_num, GFP_KERNEL);
-		if (ret) {
-			m4u_info("%s alloc_sgtable fail, ret:%d\n",
-				 __func__, ret);
-			return -ENOMEM;
-		}
+		sg_alloc_table(sg_table, page_num, GFP_KERNEL);
+
 		for_each_sg(sg_table->sgl, sg, sg_table->nents, i) {
 			sg_dma_address(sg) = page_size * (i + 1);
 			sg_dma_len(sg) = page_size;
 		}
-		m4u_map_sgtable(domain, mva,
-			sg_table, page_num * page_size,
-			M4U_PROT_WRITE | M4U_PROT_READ);
+		m4u_map_sgtable(domain, mva, sg_table,
+			page_num * page_size, M4U_PROT_WRITE | M4U_PROT_READ);
 		m4u_dump_pgtable(domain, NULL);
 		m4u_unmap(domain, mva, page_num * page_size);
 		m4u_dump_pgtable(domain, NULL);
@@ -492,28 +475,22 @@ static int m4u_debug_set(void *data, u64 val)
 		}
 		break;
 	case 4:
-	{       /* map 16M page only */
+	{                   /* map16Mpageonly */
 		struct sg_table table;
 		struct sg_table *sg_table = &table;
 		struct scatterlist *sg;
-		int i, ret;
+		int i;
 		int page_num = 2;
 		unsigned int page_size = SZ_16M;
 		unsigned int mva = SZ_16M;
 
-		ret = sg_alloc_table(sg_table, page_num, GFP_KERNEL);
-		if (ret) {
-			m4u_info("%s alloc_sgtable fail, ret:%d\n",
-				 __func__, ret);
-			return -ENOMEM;
-		}
+		sg_alloc_table(sg_table, page_num, GFP_KERNEL);
 		for_each_sg(sg_table->sgl, sg, sg_table->nents, i) {
 			sg_dma_address(sg) = page_size * (i + 1);
 			sg_dma_len(sg) = page_size;
 		}
-		m4u_map_sgtable(domain, mva,
-			sg_table, page_num * page_size,
-			M4U_PROT_WRITE | M4U_PROT_READ);
+		m4u_map_sgtable(domain, mva, sg_table,
+			page_num * page_size, M4U_PROT_WRITE | M4U_PROT_READ);
 		m4u_dump_pgtable(domain, NULL);
 		m4u_unmap(domain, mva, page_num * page_size);
 		m4u_dump_pgtable(domain, NULL);
@@ -521,27 +498,20 @@ static int m4u_debug_set(void *data, u64 val)
 		}
 		break;
 	case 5:
-	{       /* map misc pages */
+	{                   /* mapmiscpages */
 		struct sg_table table;
 		struct sg_table *sg_table = &table;
 		struct scatterlist *sg;
 		unsigned int mva = 0x4000;
 		unsigned int size = SZ_16M * 2;
-		int ret;
 
-		ret = sg_alloc_table(sg_table, 1, GFP_KERNEL);
-		if (ret) {
-			m4u_info("%s alloc_sgtable fail, ret:%d\n",
-				 __func__, ret);
-			return -ENOMEM;
-		}
+		sg_alloc_table(sg_table, 1, GFP_KERNEL);
 		sg = sg_table->sgl;
 		sg_dma_address(sg) = 0x4000;
 		sg_dma_len(sg) = size;
 
 		m4u_map_sgtable(domain, mva,
-			sg_table, size,
-			M4U_PROT_WRITE | M4U_PROT_READ);
+			sg_table, size, M4U_PROT_WRITE | M4U_PROT_READ);
 		m4u_dump_pgtable(domain, NULL);
 		m4u_unmap(domain, mva, size);
 		m4u_dump_pgtable(domain, NULL);
@@ -560,37 +530,33 @@ static int m4u_debug_set(void *data, u64 val)
 	case 9:                /* m4u_alloc_mvausingkmallocbuffer */
 	{
 		m4u_test_reclaim(SZ_16K);
-		m4u_mvaGraph_dump(m4u_test_domain);
+		m4u_mvaGraph_dump();
 	}
 	break;
 	case 10:
 	{
 		unsigned int mva;
 
-		mva = m4u_do_mva_alloc_fix(m4u_test_domain, 0,
-				0x90000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0x90000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(m4u_test_domain, 0,
-				0xb0000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xb0000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(m4u_test_domain, 0,
-				0xa0000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xa0000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(m4u_test_domain, 0,
-				0xa4000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xa4000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		m4u_mvaGraph_dump(m4u_test_domain);
-		m4u_do_mva_free(m4u_test_domain, 0x90000000, 0x10000000);
-		m4u_do_mva_free(m4u_test_domain, 0xa0000000, 0x10000000);
-		m4u_do_mva_free(m4u_test_domain, 0xb0000000, 0x10000000);
-		m4u_mvaGraph_dump(m4u_test_domain);
+		m4u_mvaGraph_dump();
+		m4u_do_mva_free(0x90000000, 0x10000000);
+		m4u_do_mva_free(0xa0000000, 0x10000000);
+		m4u_do_mva_free(0xb0000000, 0x10000000);
+		m4u_mvaGraph_dump();
 	}
 	break;
 	case 11:    /* map unmap kernel */
 		m4u_test_map_kernel();
 		break;
 	case 12:
-		/*ddp_mem_test();*/
+		/* ddp_mem_test(); */
 		break;
 	case 13:
 	    m4u_test_ddp(M4U_PROT_READ|M4U_PROT_WRITE);
@@ -608,17 +574,17 @@ static int m4u_debug_set(void *data, u64 val)
 		m4u_dump_pfh_tlb(0);
 		break;
 	case 18:
-	{
-		if (TOTAL_M4U_NUM > 2)
+		if (TOTAL_M4U_NUM == 2) {
 			m4u_dump_main_tlb(1, 0);
+			break;
+		}
 		break;
-	}
 	case 19:
-	{
-		if (TOTAL_M4U_NUM > 1)
+		if (TOTAL_M4U_NUM == 2) {
 			m4u_dump_pfh_tlb(1);
+			break;
+		}
 		break;
-	}
 	case 20:
 	{
 		struct M4U_PORT_STRUCT rM4uPort;
@@ -653,7 +619,25 @@ static int m4u_debug_set(void *data, u64 val)
 	break;
 	case 22:
 	{
-		m4u_info("[%s %d]Reserved entry\n", __func__, __LINE__);
+		int i;
+		unsigned int *pSrc;
+
+		pSrc = vmalloc(128);
+		if (!pSrc) {
+			M4UMSG("vmalloc failed!\n");
+			return 0;
+		}
+		memset(pSrc, 55, 128);
+		m4u_cache_sync(NULL, 0, 0, 0, 0, M4U_CACHE_FLUSH_ALL);
+
+		for (i = 0; i < 128 / 32; i += 32) {
+			M4UMSG(
+				"+0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
+			       8 * i, pSrc[i], pSrc[i + 1], pSrc[i + 2],
+			       pSrc[i + 3], pSrc[i + 4],
+			       pSrc[i + 5], pSrc[i + 6], pSrc[i + 7]);
+		}
+		vfree(pSrc);
 	}
 	break;
 	case 23:
@@ -670,7 +654,7 @@ static int m4u_debug_set(void *data, u64 val)
 	case 24:
 	{
 		unsigned int *pSrc;
-		unsigned int mva = 0;
+		unsigned int mva;
 		unsigned long pa;
 		struct m4u_client_t *client = m4u_create_client();
 
@@ -686,7 +670,6 @@ static int m4u_debug_set(void *data, u64 val)
 		pa = m4u_mva_to_pa(NULL, 0, mva);
 		M4UMSG("(2) mva:0x%x pa:0x%lx\n", mva, pa);
 		m4u_destroy_client(client);
-		vfree(pSrc);
 	}
 	break;
 	case 25:
@@ -696,52 +679,163 @@ static int m4u_debug_set(void *data, u64 val)
 		m4u_monitor_stop(0);
 		break;
 	case 27:
-		m4u_dump_reg_for_smi_hang_issue();
+		/*m4u_dump_reg_for_smi_hang_issue();*/
 		break;
 	case 28:
-		m4u_dump_reg_for_vpu_hang_issue();
-		break;
-	case 29:
 	{
-		m4u_test_domain = 0;
-		M4UMSG("debug m4u domain set 0\n");
+#if 0
+		unsigned char *pSrc;
+		unsigned char *pDst;
+		unsigned int mva_rd;
+		unsigned int mva_wr;
+		unsigned int allocated_size = 1024;
+		unsigned int i;
+		struct m4u_client_t *client = m4u_create_client();
+
+		m4u_monitor_start(0);
+
+		pSrc = vmalloc(allocated_size);
+		memset(pSrc, 0xFF, allocated_size);
+		M4UMSG("(0) vmalloc pSrc:0x%p\n", pSrc);
+		pDst =  vmalloc(allocated_size);
+		memset(pDst, 0xFF, allocated_size);
+		M4UMSG("(0) vmalloc pDst:0x%p\n", pDst);
+		M4UMSG("(1) pDst check 0x%x 0x%x 0x%x 0x%x  0x%x\n",
+			*pDst, *(pDst+1),
+			*(pDst+126), *(pDst+127), *(pDst+128));
+
+
+		m4u_alloc_mva(client, M4U_PORT_DISP_FAKE_LARB0,
+			(unsigned long)pSrc,
+			NULL, allocated_size, 0, 0, &mva_rd);
+		m4u_alloc_mva(client, M4U_PORT_DISP_FAKE_LARB0,
+			(unsigned long)pDst,
+			NULL, allocated_size, 0, 0, &mva_wr);
+
+		m4u_dump_pgtable(domain, NULL);
+
+		m4u_display_fake_engine_test(mva_rd, mva_wr);
+
+		M4UMSG("(2) mva_wr:0x%x\n", mva_wr);
+
+		m4u_dealloc_mva(client, M4U_PORT_DISP_FAKE_LARB0, mva_rd);
+		m4u_dealloc_mva(client, M4U_PORT_DISP_FAKE_LARB0, mva_wr);
+
+		m4u_cache_sync(NULL, 0, 0, 0, 0, M4U_CACHE_FLUSH_ALL);
+
+		m4u_destroy_client(client);
+
+		M4UMSG("(3) pDst check 0x%x 0x%x 0x%x 0x%x  0x%x\n",
+			*pDst, *(pDst+1),
+			*(pDst+126), *(pDst+127), *(pDst+128));
+
+		vfree(pSrc);
+		vfree(pDst);
+
+		m4u_monitor_stop(0);
+#endif
+		break;
 	}
-	break;
+
+	/*debug mva allocation for porting vpu in m4u 2.4 from case 30 to 33.*/
 	case 30:
 	{
-		m4u_test_domain = 1;
-		M4UMSG("debug m4u domain set 1\n");
+		M4UMSG("start to test m4u 2.4\n");
+		test_case_check_mva_region();
+		break;
 	}
-	break;
+
+	case 31:
+	{
+		M4UMSG("start to test m4u 2.4\n");
+		test_case_m4u_do_mva_alloc();
+		break;
+	}
+
+	case 32:
+	{
+		M4UMSG("start to test m4u 2.4\n");
+		test_case_m4u_do_mva_alloc_fix();
+		break;
+	}
+
+	case 33:
+	{
+		M4UMSG("start to test m4u 2.4\n");
+		test_case_m4u_do_mva_alloc_start_from();
+		break;
+	}
+
+	case 34:
+	{
+		M4UMSG("start to test m4u 2.4\n");
+		test_case_m4u_do_mva_free();
+		break;
+	}
+
+	case 35:
+	{
+		M4UMSG("start to test m4u 2.4\n");
+		test_m4u_do_mva_alloc_stage3();
+		break;
+	}
+
+	case 36:
+	{
+		M4UMSG("start to test m4u 2.4\n");
+		test_m4u_do_mva_alloc_start_from_V2p4();
+		break;
+	}
+	case 37:
+	{
+		M4UMSG("start to test m4u 2.4\n");
+		test_m4u_do_mva_alloc_start_from_V2p4_case1();
+		break;
+	}
+
+	/*debug pagetable corruption*/
+	case 38:
+	{
+		int ret;
+		unsigned int mva;
+		int size;
+		struct m4u_client_t *client;
+		unsigned long va;
+
+		size = 0x500000;
+		va = (unsigned long)vmalloc(size);
+		client = m4u_create_client();
+		if (IS_ERR_OR_NULL(client))
+			M4UMSG("create client fail!\n");
+		ret = m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, va, NULL, size,
+				    M4U_PROT_READ | M4U_PROT_CACHE, 0, &mva);
+		if (ret) {
+			M4UMSG(
+				"alloc mva fail: va=0x%lx size=0x%x,ret=%d\n",
+				va, size, ret);
+			return -1;
+		}
+		m4u_dump_pgtable_for_debug(mva, size);
+		ret = m4u_dealloc_mva(client, M4U_PORT_DISP_OVL0, mva);
+		/* clean */
+		m4u_destroy_client(client);
+		vfree((void *)va);
+		break;
+	}
+
 #ifdef M4U_TEE_SERVICE_ENABLE
 	case 50:
 	{
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) &&   \
-		defined(CONFIG_TEE)
+#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) &&	\
+		defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
 		u32 sec_handle = 0;
-		int ret = 0;
-#ifdef CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM
 		u32 refcount;
 
-		ret = trusted_mem_api_alloc(TRUSTED_MEM_REQ_SVP, 0, 0x1000,
-					    &refcount, &sec_handle,
-					    "m4u_ut", 0);
-#endif
-		M4UMSG("m4u atf dump test\n");
-		m4u_call_atf_debug(M4U_ATF_DUMP_INFO);
-		if (ret == -ENOMEM) {
-			M4UMSG("%s[%d] UT FAIL: out of memory\n",
-			       __func__, __LINE__);
-			return ret;
-		}
-		if (sec_handle <= 0) {
-			M4UMSG("%s[%d] sec memory alloc error: handle %u\n",
-			       __func__, __LINE__, sec_handle);
-			return sec_handle;
-		}
-
+		trusted_mem_api_alloc(TRUSTED_MEM_REQ_SVP, 0, 0x1000, &refcount,
+			&sec_handle, "m4u_ut", 0);
 #elif defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
 		u32 sec_handle = 0;
+		u32 refcount = 0;
 		int ret = 0;
 
 		ret = KREE_AllocSecurechunkmemWithTag(0,
@@ -749,18 +843,19 @@ static int m4u_debug_set(void *data, u64 val)
 		if (ret != TZ_RESULT_SUCCESS) {
 			IONMSG(
 				"KREE_AllocSecurechunkmemWithTag failed, ret is 0x%x\n",
-					ret);
+				ret);
 			return ret;
 		}
 #endif
 		m4u_sec_init();
-	}
 	break;
+	}
 	case 51:
 	{
 		struct M4U_PORT_STRUCT port;
 
-		memset(&port, 0, sizeof(struct M4U_PORT_STRUCT));
+		memset(&port, 0,
+			sizeof(struct M4U_PORT_STRUCT));
 
 		port.ePortID = M4U_PORT_HW_VDEC_PP_EXT;
 		port.Virtuality = 1;
@@ -787,26 +882,6 @@ static int m4u_debug_set(void *data, u64 val)
 	}
 	break;
 #endif
-	case 52:
-	{
-		M4UMSG("---- 52. Physical MAU assert test. ----- Start!\n");
-		mau_start_monitor(
-				0, /* multimedia[0], vpu[1] */
-				0, /* Slave id, need try, can be 0 or 1*/
-				0, /* Force 0 for 6779, only has 1 set MAU */
-				0, /* Write[1] or Read[0] operaion*/
-				1, /* Address is mva[1] or pa[0] */
-				0, /* Input[0] to M4U or Output[1] to EMI */
-				0, /* bit[33:32] for start address */
-				0, /* bit[33:32] for start address */
-				0x100000,   /* start address */
-				0xffffffff, /* end   address */
-				0xffffffff, /* port select by mask */
-				0xffffffff  /* larb select by mask */
-				);
-		M4UMSG("---- 52. Physical MAU assert test. ------- End!\n");
-	}
-	break;
 	default:
 		M4UMSG("%s error,val=%llu\n", __func__, val);
 	}
@@ -820,19 +895,7 @@ static int m4u_debug_get(void *data, u64 *val)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
-DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_fops,
-	m4u_debug_get,
-	m4u_debug_set,
-	"%llu\n");
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-DEFINE_PROC_ATTRIBUTE(m4u_proc_fops,
-	m4u_debug_get,
-	m4u_debug_set,
-	"%llu\n");
-#endif
+DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_fops, m4u_debug_get, m4u_debug_set, "%llu\n");
 
 #if (M4U_DVT != 0)
 static void m4u_test_init(void)
@@ -902,8 +965,9 @@ static void m4u_test_end(int invalid_tlb)
 #endif
 
 #if (M4U_DVT != 0)
-static int __vCatchTranslationFault(struct m4u_domain_t *domain,
-	unsigned int layer, unsigned int seed_mva)
+static int __vCatchTranslationFault(struct m4u_domain *domain,
+		unsigned int layer,
+				    unsigned int seed_mva)
 {
 	struct imu_pgd_t *pgd;
 	struct imu_pte_t *pte;
@@ -913,9 +977,9 @@ static int __vCatchTranslationFault(struct m4u_domain_t *domain,
 
 	int pt_type = m4u_get_pt_type(domain, seed_mva);
 
-	M4UMSG("%s, layer = %d, seed_mva = 0x%x.\n",
-			__func__,
-			layer, seed_mva);
+	M4UMSG(
+		"%s, layer = %d, seed_mva = 0x%x.\n",
+			__func__, layer, seed_mva);
 
 	if (seed_mva == 0) {
 		M4UMSG("seed_mva = 0 !!!!!!!!!!!\n");
@@ -957,9 +1021,8 @@ static int __vCatchTranslationFault(struct m4u_domain_t *domain,
 	return 0;
 }
 
-static int __vCatchInvalidPhyFault(
-		struct m4u_domain_t *domain, int g4_mode,
-		unsigned int seed_mva)
+static int __vCatchInvalidPhyFault(struct m4u_domain *domain,
+	int g4_mode, unsigned int seed_mva)
 {
 	struct imu_pgd_t *pgd;
 	struct imu_pte_t *pte;
@@ -1013,32 +1076,37 @@ static int __vCatchInvalidPhyFault(
 #if (M4U_DVT != 0)
 static int m4u_test_set(void *data, u64 val)
 {
-	struct m4u_domain_t *domain = data;
+	struct m4u_domain *domain = data;
 
 	M4UMSG("%s:val=%llu\n", __func__, val);
 
 	switch (val) {
 	case 1:
-		M4UMSG("1. MMU translation with main TLB only.Start!\n");
+		M4UMSG(
+			"---------- 1. MMU translation with main TLB only. ---------- Start!\n");
 		m4u_test_init();
 		m4u_enable_prefetch(0, 0);
 		m4u_test_start();
 		m4u_test_end(1);
 		m4u_enable_prefetch(0, 1);
-		M4UMSG("1. MMU trans with main TLB only.End!\n");
+		M4UMSG(
+			"---------- 1. MMU translation with main TLB only. ---------- End!\n");
 		break;
 
 	case 2:
-		M4UMSG("2. MMU trans both main TLB and pre-fetch TLB.S!\n");
+		M4UMSG(
+			"---------- 2. MMU translation with both main TLB and pre-fetch TLB. ---------- Start!\n");
 		m4u_test_init();
 		m4u_enable_prefetch(0, 1);
 		m4u_test_start();
 		m4u_test_end(1);
-		M4UMSG("2. MMU trans both main TLB and pre-fetch TLB.E!\n");
+		M4UMSG(
+			"---------- 2. MMU translation with both main TLB and pre-fetch TLB. ---------- End!\n");
 		break;
 
 	case 3:
-		M4UMSG("3. Range invalidate TLBs static test.Start!\n");
+		M4UMSG(
+			"---------- 3. Range invalidate TLBs static test. ---------- Start!\n");
 		m4u_test_init();
 		m4u_test_start();
 		m4u_test_end(0);
@@ -1048,7 +1116,8 @@ static int m4u_test_set(void *data, u64 val)
 		m4u_confirm_range_invalidated(0,
 			gM4U_seed_mva, gM4U_seed_mva + 0x1000000);
 		m4u_dump_valid_main_tlb(0, 0);
-		M4UMSG("3. Range invalidate TLBs static test.End!\n");
+		M4UMSG(
+			"---------- 3. Range invalidate TLBs static test. ---------- End!\n");
 		break;
 
 	case 4:
@@ -1056,19 +1125,21 @@ static int m4u_test_set(void *data, u64 val)
 			int i;
 
 			M4UMSG(
-				"4. Range invalidate TLBs dynamic test.Start!\n");
+				"---------- 4. Range invalidate TLBs dynamic test. ---------- Start!\n");
 			m4u_test_init();
 			m4u_test_start();
 			for (i = 0; i < 100; i++)
 				m4u_invalid_tlb_by_range(domain, gM4U_seed_mva,
 					gM4U_seed_mva + 0x1000000);
 			m4u_test_end(1);
-			M4UMSG("4. Range invalidate TLBs dynamic test.End!\n");
+			M4UMSG(
+				"---------- 4. Range invalidate TLBs dynamic test. ---------- End!\n");
 		}
 		break;
 
 	case 5:
-		M4UMSG("5. Invalidate all TLBs static test.Start!\n");
+		M4UMSG(
+			"---------- 5. Invalidate all TLBs static test. ---------- Start!\n");
 		m4u_test_init();
 		m4u_test_start();
 		m4u_test_end(0);
@@ -1076,44 +1147,50 @@ static int m4u_test_set(void *data, u64 val)
 		m4u_invalid_tlb_all(0);
 		m4u_confirm_all_invalidated(0);
 		m4u_dump_valid_main_tlb(0, 0);
-		M4UMSG("5. Invalidate all TLBs static test. End!\n");
+		M4UMSG(
+			"---------- 5. Invalidate all TLBs static test. ---------- End!\n");
 		break;
 
 	case 6:
 		{
 			int i;
 
-			M4UMSG("6. Invalidate all TLBs dynamic test. Start!\n");
+			M4UMSG(
+				"---------- 6. Invalidate all TLBs dynamic test. ---------- Start!\n");
 			m4u_test_init();
 			m4u_test_start();
 			for (i = 0; i < 100; i++)
 				m4u_invalid_tlb_all(0);
 			m4u_test_end(1);
 			m4u_dump_valid_main_tlb(0, 0);
-			M4UMSG("6. Invalidate all TLBs dynamic test.End!\n");
+			M4UMSG(
+				"---------- 6. Invalidate all TLBs dynamic test. ---------- End!\n");
 		}
 		break;
 
 	case 8:
-		M4UMSG("8. SW manual mode to program main TLB. Start!\n");
+		M4UMSG(
+			"---------- 8. SW manual mode to program main TLB. ---------- Start!\n");
 		m4u_test_init();
 		m4u_dump_main_tlb(0, 0);
 #if (M4U_DVT == MMU_PT_TYPE_LARGE_PAGE || M4U_DVT == MMU_PT_TYPE_SMALL_PAGE)
-		m4u_manual_insert_entry(0,
-			gM4U_seed_mva, 1, M4U_DVT, 0, 0, gM4U_seed_mva);
+		m4u_manual_insert_entry(0, gM4U_seed_mva,
+			1, M4U_DVT, 0, 0, gM4U_seed_mva);
 		m4u_dump_valid_main_tlb(0, 0);
 #else
-		m4u_manual_insert_entry(0,
-			gM4U_seed_mva, 0, M4U_DVT, 0, 0, gM4U_seed_mva);
+		m4u_manual_insert_entry(0, gM4U_seed_mva,
+			0, M4U_DVT, 0, 0, gM4U_seed_mva);
 		m4u_dump_valid_main_tlb(0, 0);
 #endif
 		m4u_test_start();
 		m4u_test_end(1);
-		M4UMSG("8. SW manual mode to program main TLB.End!\n");
+		M4UMSG(
+			"---------- 8. SW manual mode to program main TLB. ---------- End!\n");
 		break;
 
 	case 9:
-		M4UMSG("---------- 9. Main TLB lock mode. ---------- Start!\n");
+		M4UMSG(
+			"---------- 9. Main TLB lock mode. ---------- Start!\n");
 		m4u_test_init();
 #if (M4U_DVT == MMU_PT_TYPE_LARGE_PAGE || M4U_DVT == MMU_PT_TYPE_SMALL_PAGE)
 		m4u_manual_insert_entry(0,
@@ -1129,7 +1206,8 @@ static int m4u_test_set(void *data, u64 val)
 		m4u_test_end(1);
 		m4u_dump_valid_main_tlb(0, 0);
 
-		M4UMSG("---------- 9. Main TLB lock mode. ---------- End!\n");
+		M4UMSG(
+			"---------- 9. Main TLB lock mode. ---------- End!\n");
 		break;
 
 	case 10:
@@ -1137,7 +1215,8 @@ static int m4u_test_set(void *data, u64 val)
 			int i, j;
 			int seq_id;
 
-			M4UMSG("10. Sequential range feature.Start!\n");
+			M4UMSG(
+				"---------- 10. Sequential range feature. ---------- Start!\n");
 
 			seq_id = m4u_insert_seq_range(0,
 				gM4U_seed_mva, gM4U_seed_mva + 0x1000000);
@@ -1148,7 +1227,8 @@ static int m4u_test_set(void *data, u64 val)
 			m4u_dump_valid_main_tlb(0, 0);
 			if (seq_id >= 0)
 				m4u_invalid_seq_range_by_id(0, seq_id);
-			M4UMSG("10. Sequential range feature.End!\n");
+			M4UMSG(
+				"---------- 10. Sequential range feature. ---------- End!\n");
 		}
 		break;
 
@@ -1156,26 +1236,24 @@ static int m4u_test_set(void *data, u64 val)
 		{
 			int i;
 
-			M4UMSG("11. Single entry test.Start!\n");
+			M4UMSG(
+				"---------- 11. Single entry test. ---------- Start!\n");
 			m4u_test_init();
 			m4u_enable_MTLB_allshare(0, 1);
 			for (i = 0; i < 31; i++)
 #if (M4U_DVT == MMU_PT_TYPE_LARGE_PAGE || M4U_DVT == MMU_PT_TYPE_SMALL_PAGE)
 				m4u_manual_insert_entry(0,
-					gM4U_seed_mva + i * 4096,
-					1, M4U_DVT, 0,
+					gM4U_seed_mva + i * 4096, 1, M4U_DVT, 0,
 					1, gM4U_seed_mva + i * 4096);
 #endif
 #if (M4U_DVT == MMU_PT_TYPE_SECTION)
 			m4u_manual_insert_entry(0,
-				gM4U_seed_mva + i * 4096,
-				0, M4U_DVT, 0, 1,
+				gM4U_seed_mva + i * 4096, 0, M4U_DVT, 0, 1,
 				gM4U_seed_mva + i * 4096);
 #endif
 #if (M4U_DVT == MMU_PT_TYPE_SUPERSECTION)
 			m4u_manual_insert_entry(0,
-				i * 4096, 1,
-				MMU_PT_TYPE_SMALL_PAGE, 0, 1,
+				i * 4096, 1, MMU_PT_TYPE_SMALL_PAGE, 0, 1,
 				i * 4096);
 #endif
 
@@ -1185,7 +1263,8 @@ static int m4u_test_set(void *data, u64 val)
 			m4u_test_end(1);
 			m4u_enable_MTLB_allshare(0, 0);
 
-			M4UMSG("11. Single entry test. End!\n");
+			M4UMSG(
+				"---------- 11. Single entry test. ---------- End!\n");
 		}
 		break;
 
@@ -1194,14 +1273,16 @@ static int m4u_test_set(void *data, u64 val)
 		{
 			int count;
 
-			M4UMSG("13. MMU performance counter.Start!\n");
+			M4UMSG(
+				"---------- 13. MMU performance counter. ---------- Start!\n");
 			m4u_test_init();
 			m4u_test_start();
 			for (count = 0; count < 100; count++)
 				M4UMSG("test %d ......\n", count);
 			m4u_test_end(1);
 
-			M4UMSG("13. MMU performance counter. End!\n");
+			M4UMSG(
+				"---------- 13. MMU performance counter. ---------- End!\n");
 		}
 		break;
 
@@ -1212,13 +1293,13 @@ static int m4u_test_set(void *data, u64 val)
 			int count;
 
 			M4UMSG(
-				"14.Entry number versus per evaluation.Start!\n");
+				"---------- 14. Entry number versus performance evaluation. ---------- Start!\n");
 
 			m4u_test_init();
 			m4u_enable_MTLB_allshare(0, 1);
 			for (i = 0; i < 30; i++)
-				m4u_manual_insert_entry(0,
-					i * 4096, 1, MMU_PT_TYPE_SMALL_PAGE, 0,
+				m4u_manual_insert_entry(0, i * 4096,
+					1, MMU_PT_TYPE_SMALL_PAGE, 0,
 							1, i * 4096);
 
 			m4u_dump_valid_main_tlb(0, 0);
@@ -1230,7 +1311,7 @@ static int m4u_test_set(void *data, u64 val)
 			m4u_enable_MTLB_allshare(0, 0);
 
 			M4UMSG(
-				"14. Entry number versus performance evaluation.End!\n");
+				"---------- 14. Entry number versus performance evaluation. ---------- End!\n");
 		}
 		break;
 
@@ -1238,7 +1319,8 @@ static int m4u_test_set(void *data, u64 val)
 
 	case 15:
 		{
-			M4UMSG("15. Translation fault.Start!\n");
+			M4UMSG(
+				"---------- 15. Translation fault. ---------- Start!\n");
 			m4u_test_init();
 			m4u_test_start();
 			__vCatchTranslationFault(domain, 0, gM4U_seed_mva);
@@ -1249,32 +1331,30 @@ static int m4u_test_set(void *data, u64 val)
 			__vCatchTranslationFault(domain, 1, gM4U_seed_mva);
 			m4u_test_end(1);
 #endif
-			M4UMSG("15. Translation fault.End!\n");
+			M4UMSG(
+				"---------- 15. Translation fault. ---------- End!\n");
 		}
 		break;
 
 	case 16:
-		M4UMSG("16. TLB multi-hit fault.Start!\n");
+		M4UMSG(
+			"---------- 16. TLB multi-hit fault. ---------- Start!\n");
 		m4u_test_init();
 #if (M4U_DVT == MMU_PT_TYPE_LARGE_PAGE || M4U_DVT == MMU_PT_TYPE_SMALL_PAGE)
 		m4u_manual_insert_entry(0,
-			gM4U_seed_mva, 1, M4U_DVT,
-			0, 0, gM4U_seed_mva);
+			gM4U_seed_mva, 1, M4U_DVT, 0, 0, gM4U_seed_mva);
 #else
 		m4u_manual_insert_entry(0,
-			gM4U_seed_mva, 0, M4U_DVT,
-			0, 0, gM4U_seed_mva);
+			gM4U_seed_mva, 0, M4U_DVT, 0, 0, gM4U_seed_mva);
 #endif
 		M4UMSG("valid main tlb 1\n");
 		m4u_dump_valid_main_tlb(0, 0);
 #if (M4U_DVT == MMU_PT_TYPE_LARGE_PAGE || M4U_DVT == MMU_PT_TYPE_SMALL_PAGE)
 		m4u_manual_insert_entry(0,
-			gM4U_seed_mva, 1, M4U_DVT,
-			0, 0, gM4U_seed_mva);
+			gM4U_seed_mva, 1, M4U_DVT, 0, 0, gM4U_seed_mva);
 #else
 		m4u_manual_insert_entry(0,
-			gM4U_seed_mva, 0, M4U_DVT,
-			0, 0, gM4U_seed_mva);
+			gM4U_seed_mva, 0, M4U_DVT, 0, 0, gM4U_seed_mva);
 #endif
 
 		M4UMSG("valid main tlb 2\n");
@@ -1284,45 +1364,47 @@ static int m4u_test_set(void *data, u64 val)
 		m4u_dump_main_tlb(0, 0);
 		m4u_dump_valid_main_tlb(0, 0);
 		m4u_test_end(1);
-		M4UMSG("16. TLB multi-hit fault.End!\n");
+		M4UMSG(
+			"---------- 16. TLB multi-hit fault. ---------- End!\n");
 		break;
 
 	case 17:
 		{
 			int i;
 
-			M4UMSG("17. Entry replacement fault.Start!\n");
+			M4UMSG(
+				"---------- 17. Entry replacement fault. ---------- Start!\n");
 			m4u_enable_MTLB_allshare(0, 1);
 			m4u_test_init();
 			for (i = 0; i < 32; i++)
 #if (M4U_DVT == MMU_PT_TYPE_LARGE_PAGE || M4U_DVT == MMU_PT_TYPE_SMALL_PAGE)
 				m4u_manual_insert_entry(0,
-					gM4U_seed_mva + i * 4096, 1,
-					M4U_DVT, 0,
+					gM4U_seed_mva + i * 4096, 1, M4U_DVT, 0,
 					1, gM4U_seed_mva + i * 4096);
 #endif
 #if (M4U_DVT == MMU_PT_TYPE_SECTION)
 			m4u_manual_insert_entry(0,
-				gM4U_seed_mva + i * 4096, 0,
-				M4U_DVT, 0, 1,
-				gM4U_seed_mva + i * 4096);
+				gM4U_seed_mva + i * 4096, 0, M4U_DVT, 0, 1,
+						gM4U_seed_mva + i * 4096);
 #endif
 #if (M4U_DVT == MMU_PT_TYPE_SUPERSECTION)
-			m4u_manual_insert_entry(0,
-				i * 4096, 1, MMU_PT_TYPE_SMALL_PAGE,
-				0, 1, i * 4096);
+			m4u_manual_insert_entry(0, i * 4096,
+				1, MMU_PT_TYPE_SMALL_PAGE, 0, 1,
+						i * 4096);
 #endif
 
 			m4u_dump_valid_main_tlb(0, 0);
 			m4u_test_start();
 			m4u_test_end(1);
 			m4u_enable_MTLB_allshare(0, 0);
-			M4UMSG("17. Entry replacement fault.End!\n");
+			M4UMSG(
+				"---------- 17. Entry replacement fault. ---------- End!\n");
 		}
 		break;
 
 	case 18:
-		M4UMSG("18. Invalid physical address fault.Start!\n");
+		M4UMSG(
+			"---------- 18. Invalid physical address fault. ---------- Start!\n");
 		m4u_test_init();
 		m4u_test_start();
 		__vCatchInvalidPhyFault(domain, 0, gM4U_seed_mva);
@@ -1332,7 +1414,8 @@ static int m4u_test_set(void *data, u64 val)
 		__vCatchInvalidPhyFault(domain, 1, gM4U_seed_mva);
 		m4u_test_end(1);
 
-		M4UMSG("18. Invalid physical address fault.End!\n");
+		M4UMSG(
+			"---------- 18. Invalid physical address fault. ---------- End!\n");
 		break;
 
 	case 20:
@@ -1340,19 +1423,22 @@ static int m4u_test_set(void *data, u64 val)
 			int i;
 			void *protectva = (void *)gM4U_ProtectVA;
 
-			M4UMSG("20. Translation fault Protection.Start!\n");
+			M4UMSG(
+				"---------- 20. Translation fault Protection. ---------- Start!\n");
 			memset(protectva, 0x55, 128);
 			m4u_test_init();
 			m4u_test_start();
 			__vCatchTranslationFault(domain, 0, gM4U_seed_mva);
 			m4u_test_end(1);
 
-			M4UMSG("20. Translation fault Protection.End!\n");
+			M4UMSG(
+				"---------- 20. Translation fault Protection. ---------- End!\n");
 		}
 		break;
 
 	case 21:
-		M4UMSG("21. MMU interrupt hang function.Start!\n");
+		M4UMSG(
+			"---------- 21. MMU interrupt hang function. ---------- Start!\n");
 		m4u_enable_error_hang(0, 1);
 		m4u_test_init();
 		m4u_test_start();
@@ -1360,7 +1446,8 @@ static int m4u_test_set(void *data, u64 val)
 		m4u_test_end(1);
 		m4u_enable_error_hang(0, 0);
 
-		M4UMSG("21. MMU interrupt hang function.End!\n");
+		M4UMSG(
+			"---------- 21. MMU interrupt hang function. ---------- End!\n");
 		break;
 
 	case 22:
@@ -1368,18 +1455,19 @@ static int m4u_test_set(void *data, u64 val)
 			int i;
 
 			M4UMSG(
-				"22. Physical MAU assert test(traffic after MMU).Start!\n");
+				"---------- 22. Physical MAU assert test(traffic after MMU). ---------- Start!\n");
 			m4u_test_init();
 			m4u_test_start();
 			for (i = 0; i < 4; i++)
-				mau_start_monitor(0, 0, i,
-					0, 0, 0, 0, 0,
-					gM4U_seed_mva + i * 0x100000,
-					gM4U_seed_mva + (i + 1) * 0x100000 - 1,
-					0xffffffff, 0xffffffff);
+				mau_start_monitor(0, 0, i, 0,
+				0, 0, 0, gM4U_seed_mva + i * 0x100000,
+							gM4U_seed_mva +
+							(i + 1) * 0x100000 - 1,
+						  0xffffffff, 0xffffffff);
 			m4u_test_end(1);
 
-			M4UMSG("22. MMU interrupt hang function.End!\n");
+			M4UMSG(
+				"---------- 22. MMU interrupt hang function. ---------- End!\n");
 		}
 		break;
 
@@ -1388,25 +1476,29 @@ static int m4u_test_set(void *data, u64 val)
 			int i;
 
 			M4UMSG(
-				"23. Virtual MPU assert test(traffic before MMU).Start!\n");
+				"---------- 23. Virtual MPU assert test(traffic before MMU). ---------- Start!\n");
 			m4u_test_init();
 			m4u_test_start();
 			for (i = 0; i < 4; i++)
-				mau_start_monitor(0, 0,
-					i, 0, 1, 0, 0, 0,
+				mau_start_monitor(0, 0, i, 0,
+					1, 0, 0,
 					gM4U_seed_mva + i * 0x100000,
-					gM4U_seed_mva + (i + 1) * 0x100000 - 1,
-					0xffffffff, 0xffffffff);
+						  gM4U_seed_mva +
+						  (i + 1) * 0x100000 - 1,
+						  0xffffffff, 0xffffffff);
 			m4u_test_end(1);
 
-			M4UMSG("- 23. Virtual MPU assert test. -End!\n");
+			M4UMSG(
+				"---------- 23. Virtual MPU assert test. ---------- End!\n");
 		}
 		break;
 
 	case 29:
-		M4UMSG("- 29. Legacy 4KB-only mode test. - Start!\n");
+		M4UMSG(
+			"---------- 29. Legacy 4KB-only mode test. ---------- Start!\n");
 
-		M4UMSG("- 29. Legacy 4KB-only mode test. - End!\n");
+		M4UMSG(
+			"---------- 29. Legacy 4KB-only mode test. ---------- End!\n");
 		break;
 
 	default:
@@ -1418,25 +1510,13 @@ static int m4u_test_set(void *data, u64 val)
 
 static int m4u_test_get(void *data, u64 *val)
 {
-	gM4U_seed_mva = get_first_valid_mva(m4u_test_domain) + 0x200000;
+	gM4U_seed_mva = get_first_valid_mva() + 0x200000;
 
 	*val = gM4U_seed_mva;
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
-DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_test_fops,
-	m4u_test_get,
-	m4u_test_set,
-	"%llu\n");
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-DEFINE_PROC_ATTRIBUTE(m4u_proc_test_fops,
-	m4u_test_get,
-	m4u_test_set,
-	"%llu\n");
-#endif
+DEFINE_SIMPLE_ATTRIBUTE(m4u_test_fops, m4u_test_get, m4u_test_set, "%llu\n");
 #endif
 
 static int m4u_log_level_set(void *data, u64 val)
@@ -1456,31 +1536,20 @@ static int m4u_log_level_get(void *data, u64 *val)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
-DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_log_level_fops,
-	m4u_log_level_get,
-	m4u_log_level_set,
-	"%llu\n");
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-DEFINE_PROC_ATTRIBUTE(m4u_proc_log_level_fops,
-	m4u_log_level_get,
-	m4u_log_level_set,
-	"%llu\n");
-#endif
+DEFINE_SIMPLE_ATTRIBUTE(m4u_log_level_fops,
+	m4u_log_level_get, m4u_log_level_set, "%llu\n");
 
 static int m4u_debug_freemva_set(void *data, u64 val)
 {
-	struct m4u_domain_t *domain = data;
+	struct m4u_domain *domain = data;
 	struct m4u_buf_info_t *pMvaInfo;
 	unsigned int mva = (unsigned int)val;
 
 	M4UMSG("free mva: 0x%x\n", mva);
-	pMvaInfo = mva_get_priv(mva, m4u_test_domain);
+	pMvaInfo = mva_get_priv(mva);
 	if (pMvaInfo) {
 		m4u_unmap(domain, mva, pMvaInfo->size);
-		m4u_do_mva_free(m4u_test_domain, mva, pMvaInfo->size);
+		m4u_do_mva_free(mva, pMvaInfo->size);
 	}
 	return 0;
 }
@@ -1490,20 +1559,8 @@ static int m4u_debug_freemva_get(void *data, u64 *val)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_freemva_fops,
-	m4u_debug_freemva_get,
-	m4u_debug_freemva_set,
-	"%llu\n");
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-DEFINE_PROC_ATTRIBUTE(m4u_proc_freemva_fops,
-	m4u_debug_freemva_get,
-	m4u_debug_freemva_set,
-	"%llu\n");
-#endif
-
+	m4u_debug_freemva_get, m4u_debug_freemva_set, "%llu\n");
 
 int m4u_debug_port_show(struct seq_file *s, void *unused)
 {
@@ -1511,7 +1568,6 @@ int m4u_debug_port_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 int m4u_debug_port_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, m4u_debug_port_show, inode->i_private);
@@ -1523,29 +1579,13 @@ const struct file_operations m4u_debug_port_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-int m4u_proc_port_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, m4u_debug_port_show, PDE_DATA(inode));
-}
-
-const struct file_operations m4u_proc_port_fops = {
-	.open = m4u_proc_port_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-#endif
 
 int m4u_debug_mva_show(struct seq_file *s, void *unused)
 {
-	m4u_mvaGraph_dump(m4u_test_domain);
+	m4u_mvaGraph_dump();
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 int m4u_debug_mva_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, m4u_debug_mva_show, inode->i_private);
@@ -1557,29 +1597,13 @@ const struct file_operations m4u_debug_mva_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-int m4u_proc_mva_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, m4u_debug_mva_show, PDE_DATA(inode));
-}
-
-const struct file_operations m4u_proc_mva_fops = {
-	.open = m4u_proc_mva_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-#endif
 
 int m4u_debug_buf_show(struct seq_file *s, void *unused)
 {
-	m4u_dump_buf_info(s, m4u_test_domain);
+	m4u_dump_buf_info(s);
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 int m4u_debug_buf_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, m4u_debug_buf_show, inode->i_private);
@@ -1591,21 +1615,6 @@ const struct file_operations m4u_debug_buf_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-int m4u_proc_buf_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, m4u_debug_buf_show, PDE_DATA(inode));
-}
-
-const struct file_operations m4u_proc_buf_fops = {
-	.open = m4u_proc_buf_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-#endif
 
 int m4u_debug_monitor_show(struct seq_file *s, void *unused)
 {
@@ -1613,7 +1622,6 @@ int m4u_debug_monitor_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 int m4u_debug_monitor_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, m4u_debug_monitor_show, inode->i_private);
@@ -1625,21 +1633,6 @@ const struct file_operations m4u_debug_monitor_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-int m4u_proc_monitor_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, m4u_debug_monitor_show, PDE_DATA(inode));
-}
-
-const struct file_operations m4u_proc_monitor_fops = {
-	.open = m4u_proc_monitor_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-#endif
 
 int m4u_debug_register_show(struct seq_file *s, void *unused)
 {
@@ -1647,7 +1640,6 @@ int m4u_debug_register_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 int m4u_debug_register_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, m4u_debug_register_show, inode->i_private);
@@ -1659,172 +1651,69 @@ const struct file_operations m4u_debug_register_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
-#endif
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-int m4u_proc_register_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, m4u_debug_register_show, PDE_DATA(inode));
-}
-
-const struct file_operations m4u_proc_register_fops = {
-	.open = m4u_proc_register_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-#endif
 
 int m4u_debug_init(struct m4u_device *m4u_dev)
 {
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 	struct dentry *debug_file;
-#endif
-#if IS_ENABLED(CONFIG_PROC_FS)
-	struct proc_dir_entry *proc_file;
-#endif
-	struct m4u_domain_t *domain = m4u_get_domain_by_id(0);
+	struct m4u_domain *domain = m4u_get_domain_by_id(0);
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 	m4u_dev->debug_root = debugfs_create_dir("m4u", NULL);
 
 	if (IS_ERR_OR_NULL(m4u_dev->debug_root))
 		M4UMSG("m4u: failed to create debug dir.\n");
 
-	debug_file = debugfs_create_file("buffer",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_buf_fops);
+	debug_file = debugfs_create_file("buffer", 0644,
+		m4u_dev->debug_root, domain, &m4u_debug_buf_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 1.\n");
 
-	debug_file = debugfs_create_file("debug",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_fops);
+	debug_file = debugfs_create_file("debug", 0644,
+		m4u_dev->debug_root, domain, &m4u_debug_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 2.\n");
 
 #if (M4U_DVT != 0)
-	debug_file = debugfs_create_file("test",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_test_fops);
+	debug_file = debugfs_create_file("test", 0644,
+		m4u_dev->debug_root, domain, &m4u_test_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 3.\n");
 #endif
 
-	debug_file = debugfs_create_file("port",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_port_fops);
+	debug_file = debugfs_create_file("port", 0644,
+		m4u_dev->debug_root, domain, &m4u_debug_port_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 4.\n");
 
-	debug_file = debugfs_create_file("log_level",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_log_level_fops);
+	debug_file = debugfs_create_file("log_level", 0644,
+		m4u_dev->debug_root, domain, &m4u_log_level_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 5.\n");
 
-	debug_file = debugfs_create_file("monitor",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_monitor_fops);
+	debug_file = debugfs_create_file("monitor", 0644,
+		m4u_dev->debug_root, domain, &m4u_debug_monitor_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 6.\n");
 
-	debug_file = debugfs_create_file("register",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_register_fops);
+	debug_file = debugfs_create_file("register", 0644,
+		m4u_dev->debug_root, domain, &m4u_debug_register_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 7.\n");
 
-	debug_file = debugfs_create_file("freemva",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_freemva_fops);
+	debug_file = debugfs_create_file("freemva", 0644,
+		m4u_dev->debug_root, domain, &m4u_debug_freemva_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 8.\n");
 
-	debug_file = debugfs_create_file("mva",
-		0644, m4u_dev->debug_root, domain, &m4u_debug_mva_fops);
+	debug_file = debugfs_create_file("mva", 0644,
+		m4u_dev->debug_root, domain, &m4u_debug_mva_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 9.\n");
-#endif
 
-#if IS_ENABLED(CONFIG_PROC_FS)
-		m4u_dev->proc_root = proc_mkdir("m4u_dbg", NULL);
-
-		if (IS_ERR_OR_NULL(m4u_dev->proc_root))
-			M4UMSG("m4u: failed to create proc dir.\n");
-
-		proc_file = proc_create_data("buffer",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_buf_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 1.\n");
-
-		proc_file = proc_create_data("debug",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 2.\n");
-
-#if (M4U_DVT != 0)
-		proc_file = proc_create_data("test",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_test_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 3.\n");
-#endif
-
-		proc_file = proc_create_data("port",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_port_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 4.\n");
-
-		proc_file = proc_create_data("log_level",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_log_level_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 5.\n");
-
-		proc_file = proc_create_data("monitor",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_monitor_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 6.\n");
-
-		proc_file = proc_create_data("register",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_register_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 7.\n");
-
-		proc_file = proc_create_data("freemva",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_freemva_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 8.\n");
-
-		proc_file = proc_create_data("mva",
-					     S_IFREG | 0644,
-					     m4u_dev->proc_root,
-					     &m4u_proc_mva_fops,
-					     domain);
-		if (IS_ERR_OR_NULL(proc_file))
-			M4UMSG("m4u: failed to create proc files 9.\n");
-#endif
 
 	return 0;
 }
-#else
-int m4u_debug_init(struct m4u_device *m4u_dev)
+
+void m4u_dump_pgtable_for_debug(unsigned int mva, unsigned int mva_size)
 {
-	/* do nothing */
+	m4u_dump_pgtable_in_range(m4u_get_domain_by_id(0), mva, mva_size);
 }
-#endif
