@@ -1,1 +1,0 @@
-obj-$(CONFIG_MILLET)                       += ../../../vendor/xiaomi/kernel_modules/mihw/
