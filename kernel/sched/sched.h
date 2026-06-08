@@ -2435,7 +2435,18 @@ out:
  */
 static inline bool uclamp_is_used(void)
 {
-	return static_branch_likely(&sched_uclamp_used);
+	return min_t(unsigned int, clamp_value / UCLAMP_BUCKET_DELTA, UCLAMP_BUCKETS - 1);
+}
+
+static inline unsigned int uclamp_bucket_base_value(unsigned int clamp_value)
+{
+	return UCLAMP_BUCKET_DELTA * uclamp_bucket_id(clamp_value);
+}
+static inline unsigned int uclamp_none(enum uclamp_id clamp_id)
+{
+	if (clamp_id == UCLAMP_MIN)
+		return 0;
+	return SCHED_CAPACITY_SCALE;
 }
 #else /* CONFIG_UCLAMP_TASK */
 static inline
