@@ -99,25 +99,8 @@ static inline bool erofs_inode_is_data_compressed(unsigned int datamode)
 #define EROFS_I_ALL	\
 	((1 << (EROFS_I_DATA_MAPPING_BIT + EROFS_I_DATA_MAPPING_BITS)) - 1)
 
-#define EROFS_I_ALL	\
-	((1 << (EROFS_I_DATALAYOUT_BIT + EROFS_I_DATALAYOUT_BITS)) - 1)
-
-/* indicate chunk blkbits, thus 'chunksize = blocksize << chunk blkbits' */
-#define EROFS_CHUNK_FORMAT_BLKBITS_MASK		0x001F
-/* with chunk indexes or just a 4-byte blkaddr array */
-#define EROFS_CHUNK_FORMAT_INDEXES		0x0020
-
-#define EROFS_CHUNK_FORMAT_ALL	\
-	(EROFS_CHUNK_FORMAT_BLKBITS_MASK | EROFS_CHUNK_FORMAT_INDEXES)
-
-struct erofs_inode_chunk_info {
-	__le16 format;		/* chunk blkbits, etc. */
-	__le16 reserved;
-};
-
-/* 32-byte reduced form of an ondisk inode */
-struct erofs_inode_compact {
-	__le16 i_format;	/* inode format hints */
+struct erofs_inode_v1 {
+/*  0 */__le16 i_advise;
 
 /* 1 header + n-1 * 4 bytes inline xattr to keep continuity */
 	__le16 i_xattr_icount;
