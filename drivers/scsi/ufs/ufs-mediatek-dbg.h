@@ -77,7 +77,6 @@ enum cmd_hist_event {
 	CMD_PERF_MODE,
 	CMD_DEBUG_PROC,
 	CMD_GENERIC,
-	CMD_CLK_GATING,
 };
 
 struct utp_cmd_struct {
@@ -99,10 +98,6 @@ struct uic_cmd_struct {
 	int result;
 };
 
-struct clk_gating_event_struct {
-	u8 state;
-};
-
 struct cmd_hist_struct {
 	u8 cpu;
 	enum cmd_hist_event event;
@@ -112,7 +107,6 @@ struct cmd_hist_struct {
 	union {
 		struct utp_cmd_struct utp;
 		struct uic_cmd_struct uic;
-		struct clk_gating_event_struct clk_gating;
 	} cmd;
 };
 
