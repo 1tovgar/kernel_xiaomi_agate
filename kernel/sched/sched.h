@@ -2363,11 +2363,7 @@ static inline void cpufreq_update_util(struct rq *rq, unsigned int flags) {}
 #endif /* CONFIG_CPU_FREQ */
 
 #ifdef CONFIG_UCLAMP_TASK
-extern struct mutex uclamp_mutex;
-
 unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id);
-inline void uclamp_se_set(struct uclamp_se *uc_se,
-				 unsigned int value, bool user_defined);
 
 /**
  * uclamp_rq_util_with - clamp @util with @rq and @p effective uclamp values.
@@ -2420,19 +2416,6 @@ out:
 		return min_util;
 
 	return clamp(util, min_util, max_util);
-}
-
-/*
- * When uclamp is compiled in, the aggregation at rq level is 'turned off'
- * by default in the fast path and only gets turned on once userspace performs
- * an operation that requires it.
- *
- * Returns true if userspace opted-in to use uclamp and aggregation at rq level
- * hence is active.
- */
-static inline bool uclamp_is_used(void)
-{
-	return static_branch_likely(&sched_uclamp_used);
 }
 #else /* CONFIG_UCLAMP_TASK */
 static inline
