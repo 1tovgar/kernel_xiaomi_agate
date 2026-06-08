@@ -135,6 +135,32 @@ static bool cmd_hist_ptr_is_wraparound(int ptr)
 	return false;
 }
 
+#if BITS_PER_LONG == 32
+#define ufshcd_update_evt_hist_perf_warn(cmd, op, len) \
+do { \
+	struct ufs_hba *h = ufs_mtk_get_hba(); \
+	if (h && (cmd).duration >= 1000000000) { \
+		ufshcd_update_evt_hist(h, UFS_EVT_PERF_WARN, \
+				(u32) ((op << 24) | \
+					(((len >> 12) & 0xFF) << 16) | \
+					(div_u64((cmd).duration, 1000000)) \
+				)); \
+	} \
+} while(0)
+#else
+#define ufshcd_update_evt_hist_perf_warn(cmd, op, len) \
+do { \
+	struct ufs_hba *h = ufs_mtk_get_hba(); \
+	if (h && (cmd).duration >= 1000000000) { \
+		ufshcd_update_evt_hist(h, UFS_EVT_PERF_WARN, \
+			    (u32) ((op << 24) | \
+					(((len >> 12) & 0xFF) << 16) | \
+					((cmd).duration / 1000000) \
+				));\
+	} \
+} while (0)
+#endif
+
 static void probe_ufshcd_command(void *data, const char *dev_name,
 				 const char *str, unsigned int tag,
 				 u32 doorbell, int transfer_len, u32 intr,

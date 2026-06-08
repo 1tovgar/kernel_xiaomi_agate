@@ -1285,15 +1285,12 @@ static void vb2_req_unprepare(struct media_request_object *obj)
 	WARN_ON(!vb->req_obj.req);
 }
 
-int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
-		  struct media_request *req);
-
 static void vb2_req_queue(struct media_request_object *obj)
 {
 	struct vb2_buffer *vb = container_of(obj, struct vb2_buffer, req_obj);
 
 	mutex_lock(vb->vb2_queue->lock);
-	vb2_core_qbuf(vb->vb2_queue, vb->index, NULL, NULL);
+	vb2_core_qbuf(vb->vb2_queue, vb->index, NULL);
 	mutex_unlock(vb->vb2_queue->lock);
 }
 
@@ -1439,8 +1436,7 @@ static int vb2_start_streaming(struct vb2_queue *q)
 	return ret;
 }
 
-int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
-		  struct media_request *req)
+int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb)
 {
 	struct vb2_buffer *vb;
 	enum vb2_buffer_state orig_state;
@@ -1452,61 +1448,6 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
 	}
 
 	vb = q->bufs[index];
-
-	if ((req && q->uses_qbuf) ||
-	    (!req && vb->state != VB2_BUF_STATE_IN_REQUEST &&
-	     q->uses_requests)) {
-		dprintk(1, "queue in wrong mode (qbuf vs requests)\n");
-		return -EBUSY;
-	}
-
-	if (req) {
-		int ret;
-
-		q->uses_requests = 1;
-		if (vb->state != VB2_BUF_STATE_DEQUEUED) {
-			dprintk(1, "buffer %d not in dequeued state\n",
-				vb->index);
-			return -EINVAL;
-		}
-
-		media_request_object_init(&vb->req_obj);
-
-		/* Make sure the request is in a safe state for updating. */
-		ret = media_request_lock_for_update(req);
-		if (ret)
-			return ret;
-		ret = media_request_object_bind(req, &vb2_core_req_ops,
-						q, true, &vb->req_obj);
-		media_request_unlock_for_update(req);
-		if (ret)
-			return ret;
-
-		vb->state = VB2_BUF_STATE_IN_REQUEST;
-
-		/*
-		 * Increment the refcount and store the request.
-		 * The request refcount is decremented again when the
-		 * buffer is dequeued. This is to prevent vb2_buffer_done()
-		 * from freeing the request from interrupt context, which can
-		 * happen if the application closed the request fd after
-		 * queueing the request.
-		 */
-		media_request_get(req);
-		vb->request = req;
-
-		/* Fill buffer information for the userspace */
-		if (pb) {
-			call_void_bufop(q, copy_timestamp, vb, pb);
-			call_void_bufop(q, fill_user_buffer, vb, pb);
-		}
-
-		dprintk(2, "qbuf of buffer %d succeeded\n", vb->index);
-		return 0;
-	}
-
-	if (vb->state != VB2_BUF_STATE_IN_REQUEST)
-		q->uses_qbuf = 1;
 
 	switch (vb->state) {
 	case VB2_BUF_STATE_DEQUEUED:
@@ -2468,7 +2409,7 @@ static int __vb2_init_fileio(struct vb2_queue *q, int read)
 		 * Queue all buffers.
 		 */
 		for (i = 0; i < q->num_buffers; i++) {
-			ret = vb2_core_qbuf(q, i, NULL, NULL);
+			ret = vb2_core_qbuf(q, i, NULL);
 			if (ret)
 				goto err_reqbufs;
 			fileio->bufs[i].queued = 1;
@@ -2653,7 +2594,7 @@ static size_t __vb2_perform_fileio(struct vb2_queue *q, char __user *data, size_
 
 		if (copy_timestamp)
 			b->timestamp = ktime_get_ns();
-		ret = vb2_core_qbuf(q, index, NULL, NULL);
+		ret = vb2_core_qbuf(q, index, NULL);
 		dprintk(5, "vb2_dbuf result: %d\n", ret);
 		if (ret)
 			return ret;
@@ -2756,7 +2697,7 @@ static int vb2_thread(void *data)
 		if (copy_timestamp)
 			vb->timestamp = ktime_get_ns();
 		if (!threadio->stop)
-			ret = vb2_core_qbuf(q, vb->index, NULL, NULL);
+			ret = vb2_core_qbuf(q, vb->index, NULL);
 		call_void_qop(q, wait_prepare, q);
 		if (ret || threadio->stop)
 			break;

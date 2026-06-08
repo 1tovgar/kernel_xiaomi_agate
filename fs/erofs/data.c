@@ -99,8 +99,9 @@ static int erofs_map_blocks_flatmode(struct inode *inode,
 		err = -EIO;
 		goto err_out;
 	}
-
+out:
 	map->m_llen = map->m_plen;
+
 err_out:
 	trace_erofs_map_blocks_flatmode_exit(inode, map, flags, 0);
 	return err;

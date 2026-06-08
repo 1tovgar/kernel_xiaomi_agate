@@ -1527,11 +1527,13 @@ static void mmc_blk_cqe_complete_rq(struct mmc_queue *mq, struct request *req)
 		else
 			blk_mq_end_request(req, BLK_STS_IOERR);
 	} else if (mrq->data) {
-		if (blk_update_request(req, BLK_STS_OK, mrq->data->bytes_xfered))
+		if (blk_update_request(req, BLK_STS_OK, mrq->data->bytes_xfered)){
 			blk_mq_requeue_request(req, true);
+		}
 		else {
 			mt_biolog_cqhci_complete(req->tag);
 			__blk_mq_end_request(req, BLK_STS_OK);
+		}
 	} else if (mq->in_recovery) {
 		blk_mq_requeue_request(req, true);
 	} else {
@@ -1548,13 +1550,13 @@ static void mmc_blk_cqe_complete_rq(struct mmc_queue *mq, struct request *req)
 
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
-	if (!mq->cqe_busy)
+	if (!mq->cqe_busy) {
 		blk_mq_run_hw_queues(q, true);
-
-	if (put_card)
+	}
+	if (put_card) {
 		mmc_put_card(mq->card, &mq->ctx);
+	}
 }
-
 void mmc_blk_cqe_recovery(struct mmc_queue *mq)
 {
 	struct mmc_card *card = mq->card;

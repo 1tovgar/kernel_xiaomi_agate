@@ -83,7 +83,8 @@ static inline int qlen(struct usb_gadget *gadget, unsigned qmult)
 }
 
 /*-------------------------------------------------------------------------*/
-
+#define U_ETHER_DBG(fmt, args...) \
+		pr_debug("U_ETHER,%s, " fmt, __func__, ## args)
 /* NETWORK DRIVER HOOKUP (to the layer above this driver) */
 static int ueth_change_mtu(struct net_device *net, int new_mtu)
 {

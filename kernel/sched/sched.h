@@ -2368,9 +2368,6 @@ extern struct mutex uclamp_mutex;
 unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id);
 inline void uclamp_se_set(struct uclamp_se *uc_se,
 				 unsigned int value, bool user_defined);
-void
-uclamp_update_active_tasks(struct cgroup_subsys_state *css,
-			   unsigned int clamps);
 
 /**
  * uclamp_rq_util_with - clamp @util with @rq and @p effective uclamp values.
@@ -2435,18 +2432,7 @@ out:
  */
 static inline bool uclamp_is_used(void)
 {
-	return min_t(unsigned int, clamp_value / UCLAMP_BUCKET_DELTA, UCLAMP_BUCKETS - 1);
-}
-
-static inline unsigned int uclamp_bucket_base_value(unsigned int clamp_value)
-{
-	return UCLAMP_BUCKET_DELTA * uclamp_bucket_id(clamp_value);
-}
-static inline unsigned int uclamp_none(enum uclamp_id clamp_id)
-{
-	if (clamp_id == UCLAMP_MIN)
-		return 0;
-	return SCHED_CAPACITY_SCALE;
+	return static_branch_likely(&sched_uclamp_used);
 }
 #else /* CONFIG_UCLAMP_TASK */
 static inline

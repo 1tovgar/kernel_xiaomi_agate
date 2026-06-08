@@ -801,14 +801,6 @@ static inline unsigned int uclamp_none(enum uclamp_id clamp_id)
 	return SCHED_CAPACITY_SCALE;
 }
 
-static inline void uclamp_se_set(struct uclamp_se *uc_se,
-				 unsigned int value, bool user_defined)
-{
-	uc_se->value = value;
-	uc_se->bucket_id = uclamp_bucket_id(value);
-	uc_se->user_defined = user_defined;
-}
-
 static inline unsigned int
 uclamp_idle_value(struct rq *rq, enum uclamp_id clamp_id,
 		  unsigned int clamp_value)
@@ -1128,30 +1120,24 @@ uclamp_update_active_tasks(struct cgroup_subsys_state *css)
 {
 	struct css_task_iter it;
 	struct task_struct *p;
-
 	css_task_iter_start(css, 0, &it);
 	while ((p = css_task_iter_next(&it)))
 		uclamp_update_active(p);
 	css_task_iter_end(&it);
 }
-#endif
-
-#if defined(CONFIG_UCLAMP_TASK_GROUP) && !defined(CONFIG_SCHED_TUNE)
 static void cpu_util_update_eff(struct cgroup_subsys_state *css);
 static void uclamp_update_root_tg(void)
 {
 	struct task_group *tg = &root_task_group;
-
 	uclamp_se_set(&tg->uclamp_req[UCLAMP_MIN],
 		      sysctl_sched_uclamp_util_min, false);
 	uclamp_se_set(&tg->uclamp_req[UCLAMP_MAX],
 		      sysctl_sched_uclamp_util_max, false);
-
 	rcu_read_lock();
 	cpu_util_update_eff(&root_task_group.css);
 	rcu_read_unlock();
 }
-#elif !defined(CONFIG_UCLAMP_TASK_GROUP) && !defined(CONFIG_SCHED_TUNE)
+#else
 static void uclamp_update_root_tg(void) { }
 #endif
 

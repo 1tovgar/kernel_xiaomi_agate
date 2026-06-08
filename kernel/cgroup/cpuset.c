@@ -885,6 +885,26 @@ static void rebuild_sched_domains_cpuslocked(void)
 }
 #endif /* CONFIG_SMP */
 
+static void rebuild_sched_domains_locked(void)
+{
+	struct sched_domain_attr *attr;
+	cpumask_var_t *doms;
+	int ndoms;
+	lockdep_assert_cpus_held();
+	lockdep_assert_held(&cpuset_mutex);
+	/*
+	 * We have raced with CPU hotplug. Don't do anything to avoid
+	 * passing doms with offlined cpu to partition_sched_domains().
+	 * Anyways, hotplug work item will rebuild sched domains.
+	 */
+	if (!cpumask_equal(top_cpuset.effective_cpus, cpu_active_mask))
+		return;
+	/* Generate domain masks and attrs */
+	ndoms = generate_sched_domains(&doms, &attr);
+	/* Have scheduler rebuild the domains */
+	partition_sched_domains(ndoms, doms, attr);
+}
+
 void rebuild_sched_domains(void)
 {
 	get_online_cpus();

@@ -808,8 +808,7 @@ int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb);
  *
  * Return: returns zero on success; an error code otherwise.
  */
-int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
-		  struct media_request *req);
+int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb);
 
 /**
  * vb2_core_dqbuf() - Dequeue a buffer to the userspace

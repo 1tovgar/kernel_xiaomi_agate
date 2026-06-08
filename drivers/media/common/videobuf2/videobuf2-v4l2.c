@@ -331,117 +331,29 @@ static int vb2_fill_vb2_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b
 	return 0;
 }
 
-static int vb2_queue_or_prepare_buf(struct vb2_queue *q, struct media_device *mdev,
-				    struct v4l2_buffer *b, bool is_prepare,
-				    struct media_request **p_req)
+static int vb2_queue_or_prepare_buf(struct vb2_queue *q, struct v4l2_buffer *b,
+				    const char *opname)
 {
-	const char *opname = is_prepare ? "prepare_buf" : "qbuf";
-	struct media_request *req;
-	struct vb2_v4l2_buffer *vbuf;
-	struct vb2_buffer *vb;
-	int ret;
-
 	if (b->type != q->type) {
 		dprintk(1, "%s: invalid buffer type\n", opname);
 		return -EINVAL;
 	}
-
 	if (b->index >= q->num_buffers) {
 		dprintk(1, "%s: buffer index out of range\n", opname);
 		return -EINVAL;
 	}
-
 	if (q->bufs[b->index] == NULL) {
 		/* Should never happen */
 		dprintk(1, "%s: buffer is NULL\n", opname);
 		return -EINVAL;
 	}
-
 	if (b->memory != q->memory) {
 		dprintk(1, "%s: invalid memory type\n", opname);
 		return -EINVAL;
 	}
-
-	vb = q->bufs[b->index];
-	vbuf = to_vb2_v4l2_buffer(vb);
-	ret = __verify_planes_array(vb, b);
-	if (ret)
-		return ret;
-
-	if (!vb->prepared) {
-		/* Copy relevant information provided by the userspace */
-		memset(vbuf->planes, 0,
-		       sizeof(vbuf->planes[0]) * vb->num_planes);
-		ret = vb2_fill_vb2_v4l2_buffer(vb, b);
-		if (ret)
-			return ret;
-	}
-
-	if (is_prepare)
-		return 0;
-
-	if (!(b->flags & V4L2_BUF_FLAG_REQUEST_FD)) {
-		if (q->uses_requests) {
-			dprintk(1, "%s: queue uses requests\n", opname);
-			return -EBUSY;
-		}
-		return 0;
-	} else if (!q->supports_requests) {
-		dprintk(1, "%s: queue does not support requests\n", opname);
-		return -EACCES;
-	} else if (q->uses_qbuf) {
-		dprintk(1, "%s: queue does not use requests\n", opname);
-		return -EBUSY;
-	}
-
-	/*
-	 * For proper locking when queueing a request you need to be able
-	 * to lock access to the vb2 queue, so check that there is a lock
-	 * that we can use. In addition p_req must be non-NULL.
-	 */
-	if (WARN_ON(!q->lock || !p_req))
-		return -EINVAL;
-
-	/*
-	 * Make sure this op is implemented by the driver. It's easy to forget
-	 * this callback, but is it important when canceling a buffer in a
-	 * queued request.
-	 */
-	if (WARN_ON(!q->ops->buf_request_complete))
-		return -EINVAL;
-
-	if (vb->state != VB2_BUF_STATE_DEQUEUED) {
-		dprintk(1, "%s: buffer is not in dequeued state\n", opname);
-		return -EINVAL;
-	}
-
-	if (b->request_fd < 0) {
-		dprintk(1, "%s: request_fd < 0\n", opname);
-		return -EINVAL;
-	}
-
-	req = media_request_get_by_fd(mdev, b->request_fd);
-	if (IS_ERR(req)) {
-		dprintk(1, "%s: invalid request_fd\n", opname);
-		return PTR_ERR(req);
-	}
-
-	/*
-	 * Early sanity check. This is checked again when the buffer
-	 * is bound to the request in vb2_core_qbuf().
-	 */
-	if (req->state != MEDIA_REQUEST_STATE_IDLE &&
-	    req->state != MEDIA_REQUEST_STATE_UPDATING) {
-		dprintk(1, "%s: request is not idle\n", opname);
-		media_request_put(req);
-		return -EBUSY;
-	}
-
-	*p_req = req;
-	vbuf->request_fd = b->request_fd;
-
-	return 0;
+	return __verify_planes_array(q->bufs[b->index], b);
 }
+
 
 /*
  * __fill_v4l2_buffer() - fill in a struct v4l2_buffer with information to be
@@ -665,21 +577,14 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 }
 EXPORT_SYMBOL_GPL(vb2_reqbufs);
 
-int vb2_prepare_buf(struct vb2_queue *q, struct media_device *mdev,
-		    struct v4l2_buffer *b)
+int vb2_prepare_buf(struct vb2_queue *q, struct v4l2_buffer *b)
 {
 	int ret;
-
 	if (vb2_fileio_is_active(q)) {
 		dprintk(1, "file io in progress\n");
 		return -EBUSY;
 	}
-
-	if (b->flags & V4L2_BUF_FLAG_REQUEST_FD)
-		return -EINVAL;
-
-	ret = vb2_queue_or_prepare_buf(q, mdev, b, true, NULL);
-
+	ret = vb2_queue_or_prepare_buf(q, b, "prepare_buf");
 	return ret ? ret : vb2_core_prepare_buf(q, b->index, b);
 }
 EXPORT_SYMBOL_GPL(vb2_prepare_buf);
@@ -739,24 +644,15 @@ int vb2_create_bufs(struct vb2_queue *q, struct v4l2_create_buffers *create)
 }
 EXPORT_SYMBOL_GPL(vb2_create_bufs);
 
-int vb2_qbuf(struct vb2_queue *q, struct media_device *mdev,
-	     struct v4l2_buffer *b)
+int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 {
-	struct media_request *req = NULL;
 	int ret;
-
 	if (vb2_fileio_is_active(q)) {
 		dprintk(1, "file io in progress\n");
 		return -EBUSY;
 	}
-
-	ret = vb2_queue_or_prepare_buf(q, mdev, b, false, &req);
-	if (ret)
-		return ret;
-	ret = vb2_core_qbuf(q, b->index, b, req);
-	if (req)
-		media_request_put(req);
-	return ret;
+	ret = vb2_queue_or_prepare_buf(q, b, "qbuf");
+	return ret ? ret : vb2_core_qbuf(q, b->index, b);
 }
 EXPORT_SYMBOL_GPL(vb2_qbuf);
 
@@ -945,10 +841,9 @@ int vb2_ioctl_prepare_buf(struct file *file, void *priv,
 			  struct v4l2_buffer *p)
 {
 	struct video_device *vdev = video_devdata(file);
-
 	if (vb2_queue_is_busy(vdev, file))
 		return -EBUSY;
-	return vb2_prepare_buf(vdev->queue, vdev->v4l2_dev->mdev, p);
+	return vb2_prepare_buf(vdev->queue, p);
 }
 EXPORT_SYMBOL_GPL(vb2_ioctl_prepare_buf);
 
@@ -967,7 +862,7 @@ int vb2_ioctl_qbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 
 	if (vb2_queue_is_busy(vdev, file))
 		return -EBUSY;
-	return vb2_qbuf(vdev->queue, vdev->v4l2_dev->mdev, p);
+	return vb2_qbuf(vdev->queue, p);
 }
 EXPORT_SYMBOL_GPL(vb2_ioctl_qbuf);
 

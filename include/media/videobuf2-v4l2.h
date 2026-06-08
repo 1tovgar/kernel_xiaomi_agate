@@ -116,8 +116,7 @@ int vb2_create_bufs(struct vb2_queue *q, struct v4l2_create_buffers *create);
  * The return values from this function are intended to be directly returned
  * from &v4l2_ioctl_ops->vidioc_prepare_buf handler in driver.
  */
-int vb2_prepare_buf(struct vb2_queue *q, struct media_device *mdev,
-		    struct v4l2_buffer *b);
+int vb2_prepare_buf(struct vb2_queue *q, struct v4l2_buffer *b);
 
 /**
  * vb2_qbuf() - Queue a buffer from userspace
@@ -142,8 +141,7 @@ int vb2_prepare_buf(struct vb2_queue *q, struct media_device *mdev,
  * The return values from this function are intended to be directly returned
  * from &v4l2_ioctl_ops->vidioc_qbuf handler in driver.
  */
-int vb2_qbuf(struct vb2_queue *q, struct media_device *mdev,
-	     struct v4l2_buffer *b);
+int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b);
 
 /**
  * vb2_expbuf() - Export a buffer as a file descriptor
