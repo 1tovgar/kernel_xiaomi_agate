@@ -248,7 +248,7 @@ out_unlock:
 
 static void probe_ufshcd_uic_command(void *data, const char *dev_name,
 				     const char *str, u32 cmd,
-				     u32 arg1, u32 arg2, u32 arg3)
+				     int result, u32 arg1, u32 arg2, u32 arg3)
 {
 	int ptr;
 	unsigned long flags;
@@ -261,7 +261,7 @@ static void probe_ufshcd_uic_command(void *data, const char *dev_name,
 
 	ptr = cmd_hist_advance_ptr();
 
-	if (!strcmp(str, "send"))
+	if (!strcmp(str, "uic_send"))
 		event = CMD_UIC_SEND;
 	else
 		event = CMD_UIC_CMPL_GENERAL;
@@ -272,6 +272,7 @@ static void probe_ufshcd_uic_command(void *data, const char *dev_name,
 	cmd_hist[ptr].cmd.uic.arg1 = arg1;
 	cmd_hist[ptr].cmd.uic.arg2 = arg2;
 	cmd_hist[ptr].cmd.uic.arg3 = arg3;
+	cmd_hist[ptr].cmd.uic.result = result;
 
 	if (event == CMD_UIC_CMPL_GENERAL) {
 		ptr = cmd_hist_get_prev_ptr(cmd_hist_ptr);
@@ -542,16 +543,39 @@ static void ufsdbg_print_cmd_hist(char **buff, unsigned long *size,
 		      latest_cnt, cnt, ptr);
 
 	while (cnt) {
-		if (cmd_hist[ptr].event < CMD_UIC_SEND)
-			ufsdbg_print_utp_event(buff, size, m, ptr);
-		else if (cmd_hist[ptr].event < CMD_REG_TOGGLE)
-			ufsdbg_print_uic_event(buff, size, m, ptr);
-		else if (cmd_hist[ptr].event == CMD_CLK_GATING)
-			ufsdbg_print_clk_gating_event(buff, size, m, ptr);
-		else if (cmd_hist[ptr].event == CMD_ABORTING)
-			ufsdbg_print_utp_event(buff, size, m, ptr);
-		else if (cmd_hist[ptr].event == CMD_DEVICE_RESET)
-			ufsdbg_print_device_reset_event(buff, size, m, ptr);
+		dur = ns_to_timespec64(cmd_hist[ptr].time);
+		if (cmd_hist[ptr].event < CMD_UIC_SEND) {
+			SPREAD_PRINTF(buff, size, m,
+				"%3d-r(%d),%5d,%2d,0x%2x,t=%2d,crypt:%d,%d,lba=%llu,len=%6d,%llu.%lu,\t%llu\n",
+				ptr,
+				cmd_hist[ptr].cpu,
+				cmd_hist[ptr].pid,
+				cmd_hist[ptr].event,
+				cmd_hist[ptr].cmd.utp.opcode,
+				cmd_hist[ptr].cmd.utp.tag,
+				cmd_hist[ptr].cmd.utp.crypt_en,
+				cmd_hist[ptr].cmd.utp.crypt_keyslot,
+				cmd_hist[ptr].cmd.utp.lba,
+				cmd_hist[ptr].cmd.utp.transfer_len,
+				dur.tv_sec, dur.tv_nsec,
+				cmd_hist[ptr].duration
+				);
+		} else if (cmd_hist[ptr].event < CMD_REG_TOGGLE) {
+			SPREAD_PRINTF(buff, size, m,
+				"%3d-u(%d),%5d,%2d,0x%2x,arg1=0x%X,arg2=0x%X,arg3=0x%X,ret=%d,%llu.%lu,\t%llu\n",
+				ptr,
+				cmd_hist[ptr].cpu,
+				cmd_hist[ptr].pid,
+				cmd_hist[ptr].event,
+				cmd_hist[ptr].cmd.uic.cmd,
+				cmd_hist[ptr].cmd.uic.arg1,
+				cmd_hist[ptr].cmd.uic.arg2,
+				cmd_hist[ptr].cmd.uic.arg3,
+				cmd_hist[ptr].cmd.uic.result,
+				dur.tv_sec, dur.tv_nsec,
+				cmd_hist[ptr].duration
+				);
+		}
 		cnt--;
 		ptr--;
 		if (ptr < 0)

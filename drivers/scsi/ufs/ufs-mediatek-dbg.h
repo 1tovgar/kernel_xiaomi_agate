@@ -96,6 +96,7 @@ struct uic_cmd_struct {
 	u32 arg1;
 	u32 arg2;
 	u32 arg3;
+	int result;
 };
 
 struct clk_gating_event_struct {
