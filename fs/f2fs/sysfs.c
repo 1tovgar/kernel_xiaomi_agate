@@ -11,14 +11,13 @@
 #include <linux/f2fs_fs.h>
 #include <linux/seq_file.h>
 #include <linux/unicode.h>
-#include <linux/ioprio.h>
 
 #include "f2fs.h"
 #include "segment.h"
 #include "gc.h"
 #include <trace/events/f2fs.h>
 
-struct proc_dir_entry *f2fs_proc_root;
+static struct proc_dir_entry *f2fs_proc_root;
 
 /* Sysfs support for f2fs */
 enum {
@@ -35,7 +34,6 @@ enum {
 	FAULT_INFO_TYPE,	/* struct f2fs_fault_info */
 #endif
 	RESERVED_BLOCKS,	/* struct f2fs_sb_info */
-	CPRC_INFO,	/* struct ckpt_req_control */
 };
 
 struct f2fs_attr {
@@ -73,8 +71,6 @@ static unsigned char *__struct_ptr(struct f2fs_sb_info *sbi, int struct_type)
 	else if (struct_type == STAT_INFO)
 		return (unsigned char *)F2FS_STAT(sbi);
 #endif
-	else if (struct_type == CPRC_INFO)
-		return (unsigned char *)&sbi->cprc_info;
 	return NULL;
 }
 
@@ -90,13 +86,6 @@ static ssize_t free_segments_show(struct f2fs_attr *a,
 {
 	return sprintf(buf, "%llu\n",
 			(unsigned long long)(free_segments(sbi)));
-}
-
-static ssize_t reserved_segments_show(struct f2fs_attr *a,
-		struct f2fs_sb_info *sbi, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%llu\n",
-		(unsigned long long)(reserved_segments(sbi)));
 }
 
 static ssize_t lifetime_write_kbytes_show(struct f2fs_attr *a,
@@ -172,6 +161,71 @@ static ssize_t current_reserved_blocks_show(struct f2fs_attr *a,
 	return sprintf(buf, "%u\n", sbi->current_reserved_blocks);
 }
 
+static ssize_t unusable_show(struct f2fs_attr *a,
+		struct f2fs_sb_info *sbi, char *buf)
+{
+	block_t unusable;
+
+	if (test_opt(sbi, DISABLE_CHECKPOINT))
+		unusable = sbi->unusable_block_count;
+	else
+		unusable = f2fs_get_unusable_blocks(sbi);
+	return sprintf(buf, "%llu\n", (unsigned long long)unusable);
+}
+
+static ssize_t encoding_show(struct f2fs_attr *a,
+		struct f2fs_sb_info *sbi, char *buf)
+{
+#ifdef CONFIG_UNICODE
+	struct super_block *sb = sbi->sb;
+
+	if (f2fs_sb_has_casefold(sbi))
+		return snprintf(buf, PAGE_SIZE, "%s (%d.%d.%d)\n",
+			sb->s_encoding->charset,
+			(sb->s_encoding->version >> 16) & 0xff,
+			(sb->s_encoding->version >> 8) & 0xff,
+			sb->s_encoding->version & 0xff);
+#endif
+	return sprintf(buf, "(none)");
+}
+
+static ssize_t mounted_time_sec_show(struct f2fs_attr *a,
+		struct f2fs_sb_info *sbi, char *buf)
+{
+	return sprintf(buf, "%llu", SIT_I(sbi)->mounted_time);
+}
+
+#ifdef CONFIG_F2FS_STAT_FS
+static ssize_t moved_blocks_foreground_show(struct f2fs_attr *a,
+				struct f2fs_sb_info *sbi, char *buf)
+{
+	struct f2fs_stat_info *si = F2FS_STAT(sbi);
+
+	return sprintf(buf, "%llu\n",
+		(unsigned long long)(si->tot_blks -
+			(si->bg_data_blks + si->bg_node_blks)));
+}
+
+static ssize_t moved_blocks_background_show(struct f2fs_attr *a,
+				struct f2fs_sb_info *sbi, char *buf)
+{
+	struct f2fs_stat_info *si = F2FS_STAT(sbi);
+
+	return sprintf(buf, "%llu\n",
+		(unsigned long long)(si->bg_data_blks + si->bg_node_blks));
+}
+
+static ssize_t avg_vblocks_show(struct f2fs_attr *a,
+		struct f2fs_sb_info *sbi, char *buf)
+{
+	struct f2fs_stat_info *si = F2FS_STAT(sbi);
+
+	si->dirty_count = dirty_segments(sbi);
+	f2fs_update_sit_info(sbi);
+	return sprintf(buf, "%llu\n", (unsigned long long)(si->avg_vblocks));
+}
+#endif
+
 static ssize_t __sbi_show_value(struct f2fs_attr *a,
 		struct f2fs_sb_info *sbi, char *buf,
 		unsigned char *value)
@@ -244,7 +298,7 @@ static void __sbi_store_value(struct f2fs_attr *a,
 		break;
 	default:
 		f2fs_bug_on(sbi, 1);
-		f2fs_msg(sbi->sb, KERN_ERR, "store sysfs node value with wrong type");
+		f2fs_err(sbi, "store sysfs node value with wrong type");
 	}
 }
 
@@ -294,38 +348,6 @@ static ssize_t __sbi_store(struct f2fs_attr *a,
 out:
 		up_write(&sbi->sb_lock);
 		return ret ? ret : count;
-	}
-
-	if (!strcmp(a->attr.name, "ckpt_thread_ioprio")) {
-		const char *name = strim((char *)buf);
-		struct ckpt_req_control *cprc = &sbi->cprc_info;
-		int class;
-		long data;
-		int ret;
-
-		if (!strncmp(name, "rt,", 3))
-			class = IOPRIO_CLASS_RT;
-		else if (!strncmp(name, "be,", 3))
-			class = IOPRIO_CLASS_BE;
-		else
-			return -EINVAL;
-
-		name += 3;
-		ret = kstrtol(name, 10, &data);
-		if (ret)
-			return ret;
-		if (data >= IOPRIO_BE_NR || data < 0)
-			return -EINVAL;
-
-		cprc->ckpt_thread_ioprio = IOPRIO_PRIO_VALUE(class, data);
-		if (test_opt(sbi, MERGE_CHECKPOINT)) {
-			ret = set_task_ioprio(cprc->f2fs_issue_ckpt,
-					cprc->ckpt_thread_ioprio);
-			if (ret)
-				return ret;
-		}
-
-		return count;
 	}
 
 	ui = (unsigned int *)(ptr + a->offset);
@@ -384,12 +406,6 @@ out:
 		}
 		return count;
 	}
-
-	if (!strcmp(a->attr.name, "gc_urgent_sleep_time")) {
-		*ui = t ? (unsigned int)t : DEF_GC_THREAD_URGENT_SLEEP_TIME;
-		return count;
-	}
-
 	if (!strcmp(a->attr.name, "gc_idle")) {
 		if (t == GC_IDLE_CB)
 			sbi->gc_mode = GC_IDLE_CB;
@@ -400,15 +416,19 @@ out:
 		return count;
 	}
 
-	if (!strcmp(a->attr.name, "gc_booster")) {
-		sbi->gc_booster = !!t;
-		return count;
-	}
-
 	if (!strcmp(a->attr.name, "iostat_enable")) {
 		sbi->iostat_enable = !!t;
 		if (!sbi->iostat_enable)
 			f2fs_reset_iostat(sbi);
+		return count;
+	}
+
+	if (!strcmp(a->attr.name, "iostat_period_ms")) {
+		if (t < MIN_IOSTAT_PERIOD_MS || t > MAX_IOSTAT_PERIOD_MS)
+			return -EINVAL;
+		spin_lock(&sbi->iostat_lock);
+		sbi->iostat_period_ms = (unsigned int)t;
+		spin_unlock(&sbi->iostat_lock);
 		return count;
 	}
 
@@ -548,7 +568,6 @@ F2FS_RW_ATTR(GC_THREAD, f2fs_gc_kthread, gc_max_sleep_time, max_sleep_time);
 F2FS_RW_ATTR(GC_THREAD, f2fs_gc_kthread, gc_no_gc_sleep_time, no_gc_sleep_time);
 F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, gc_idle, gc_mode);
 F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, gc_urgent, gc_mode);
-F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, gc_booster, gc_booster);
 F2FS_RW_ATTR(SM_INFO, f2fs_sm_info, reclaim_segments, rec_prefree_segments);
 F2FS_RW_ATTR(SM_INFO, f2fs_sm_info, main_blkaddr, main_blkaddr);
 F2FS_RW_ATTR(DCC_INFO, discard_cmd_control, max_small_discards, max_discards);
@@ -585,10 +604,8 @@ F2FS_RW_ATTR(FAULT_INFO_TYPE, f2fs_fault_info, inject_type, inject_type);
 #endif
 F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, data_io_flag, data_io_flag);
 F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, node_io_flag, node_io_flag);
-F2FS_RW_ATTR(CPRC_INFO, ckpt_req_control, ckpt_thread_ioprio, ckpt_thread_ioprio);
 F2FS_GENERAL_RO_ATTR(dirty_segments);
 F2FS_GENERAL_RO_ATTR(free_segments);
-F2FS_GENERAL_RO_ATTR(reserved_segments);
 F2FS_GENERAL_RO_ATTR(lifetime_write_kbytes);
 F2FS_GENERAL_RO_ATTR(features);
 F2FS_GENERAL_RO_ATTR(current_reserved_blocks);
@@ -640,7 +657,6 @@ static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(gc_no_gc_sleep_time),
 	ATTR_LIST(gc_idle),
 	ATTR_LIST(gc_urgent),
-	ATTR_LIST(gc_booster),
 	ATTR_LIST(reclaim_segments),
 	ATTR_LIST(main_blkaddr),
 	ATTR_LIST(max_small_discards),
@@ -674,10 +690,8 @@ static struct attribute *f2fs_attrs[] = {
 #endif
 	ATTR_LIST(data_io_flag),
 	ATTR_LIST(node_io_flag),
-	ATTR_LIST(ckpt_thread_ioprio),
 	ATTR_LIST(dirty_segments),
 	ATTR_LIST(free_segments),
-	ATTR_LIST(reserved_segments),
 	ATTR_LIST(unusable),
 	ATTR_LIST(lifetime_write_kbytes),
 	ATTR_LIST(features),

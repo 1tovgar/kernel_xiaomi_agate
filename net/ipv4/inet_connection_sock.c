@@ -717,7 +717,7 @@ static bool __inet_csk_reqsk_queue_drop(struct sock *sk,
 {
 	bool unlinked = reqsk_queue_unlink(&inet_csk(sk)->icsk_accept_queue, req);
 
-	if (!from_timer && timer_delete_sync(&req->rsk_timer))
+	if (!from_timer && del_timer_sync(&req->rsk_timer))
 		reqsk_put(req);
 
 	if (unlinked) {
@@ -986,7 +986,7 @@ static void inet_child_forget(struct sock *sk, struct request_sock *req,
 	percpu_counter_inc(sk->sk_prot->orphan_count);
 
 	if (sk->sk_protocol == IPPROTO_TCP && tcp_rsk(req)->tfo_listener) {
-		BUG_ON(tcp_sk(child)->fastopen_rsk != req);
+		BUG_ON(rcu_access_pointer(tcp_sk(child)->fastopen_rsk) != req);
 		BUG_ON(sk != req->rsk_listener);
 
 		/* Paranoid, to prevent race condition if
@@ -995,7 +995,7 @@ static void inet_child_forget(struct sock *sk, struct request_sock *req,
 		 * Also to satisfy an assertion in
 		 * tcp_v4_destroy_sock().
 		 */
-		tcp_sk(child)->fastopen_rsk = NULL;
+		RCU_INIT_POINTER(tcp_sk(child)->fastopen_rsk, NULL);
 	}
 	inet_csk_destroy_sock(child);
 }

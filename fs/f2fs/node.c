@@ -756,8 +756,7 @@ int f2fs_get_dnode_of_data(struct dnode_of_data *dn, pgoff_t index, int mode)
 
 		if (nids[i] && nids[i] == dn->inode->i_ino) {
 			err = -EFSCORRUPTED;
-			f2fs_msg(sbi->sb, KERN_ERR,
-				"inode mapping table is corrupted, run fsck to fix it, "
+			f2fs_err(sbi, "inode mapping table is corrupted, run fsck to fix it, "
 				"ino:%lu, nid:%u, level:%d, offset:%d",
 				dn->inode->i_ino, nids[i], level, offset[level]);
 			set_sbi_flag(sbi, SBI_NEED_FSCK);
@@ -878,7 +877,7 @@ static int truncate_dnode(struct dnode_of_data *dn)
 
 	/* get direct node */
 	page = f2fs_get_node_page(F2FS_I_SB(dn->inode), dn->nid);
-	if (IS_ERR(page) && PTR_ERR(page) == -ENOENT)
+	if (PTR_ERR(page) == -ENOENT)
 		return 1;
 	else if (IS_ERR(page))
 		return PTR_ERR(page);
@@ -1940,12 +1939,8 @@ continue_unlock:
 				goto continue_unlock;
 			}
 
-			/* flush inline_data/inode, if it's async context. */
-			if (!do_balance)
-				goto write_node;
-
-			/* flush inline_data */
-			if (is_inline_node(page)) {
+			/* flush inline_data, if it's async context. */
+			if (do_balance && is_inline_node(page)) {
 				clear_inline_node(page);
 				unlock_page(page);
 				flush_inline_data(sbi, ino_of_node(page));
@@ -1959,7 +1954,6 @@ continue_unlock:
 					goto lock_node;
 			}
 
-write_node:
 			f2fs_wait_on_page_writeback(page, NODE, true, true);
 
 			if (!clear_page_dirty_for_io(page))
