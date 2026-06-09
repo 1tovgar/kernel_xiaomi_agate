@@ -97,7 +97,7 @@ static const struct of_device_id ufs_mtk_of_match[] = {
 extern bool clk_buf_ctrl(enum clk_buf_id id, bool onoff);
 #endif
 
-struct rpmb_dev *ufs_mtk_rpmb_get_raw_dev()
+struct rpmb_dev *ufs_mtk_rpmb_get_raw_dev(void)
 {
 	struct ufs_mtk_host *host = ufshcd_get_variant(ufs_mtk_hba);
 
@@ -1070,8 +1070,8 @@ int ufs_mtk_perf_setup_req(struct ufs_mtk_host *host, bool perf)
 	clk_disable_unprepare(host->crypto_clk_mux);
 
 out:
-	ufs_mtk_dbg_add_trace(dev_name(host->hba->dev), "perf_mode", perf,
-			0, (u32) err, 0, 0, 0, 0, 0);
+	// ufs_mtk_dbg_add_trace(dev_name(host->hba->dev), "perf_mode", perf,
+	// 		0, (u32) err, 0, 0, 0, 0, 0);
 
 	return err;
 }

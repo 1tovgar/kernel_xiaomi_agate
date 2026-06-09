@@ -83,6 +83,22 @@ static inline int qlen(struct usb_gadget *gadget, unsigned qmult)
 }
 
 /*-------------------------------------------------------------------------*/
+unsigned int rndis_test_last_resp_id;
+unsigned int rndis_test_last_msg_id;
+EXPORT_SYMBOL_GPL(rndis_test_last_msg_id);
+
+unsigned long rndis_test_reset_msg_cnt;
+EXPORT_SYMBOL_GPL(rndis_test_reset_msg_cnt);
+unsigned long rndis_test_rx_usb_in;
+unsigned long rndis_test_rx_net_out;
+unsigned long rndis_test_rx_nomem;
+unsigned long rndis_test_rx_error;
+unsigned long rndis_test_tx_net_in;
+unsigned long rndis_test_tx_busy;
+unsigned long rndis_test_tx_stop;
+unsigned long rndis_test_tx_nomem;
+unsigned long rndis_test_tx_usb_out;
+unsigned long rndis_test_tx_complete;
 #define U_ETHER_DBG(fmt, args...) \
 		pr_debug("U_ETHER,%s, " fmt, __func__, ## args)
 /* NETWORK DRIVER HOOKUP (to the layer above this driver) */
