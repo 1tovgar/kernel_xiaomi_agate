@@ -31,7 +31,6 @@
 #include <linux/tcp.h>
 #include <linux/ipv6.h>
 #include <net/ipv6.h>
-#include <linux/suspend.h>
 
 #include "ccci_core.h"
 #include "modem_sys.h"
@@ -450,7 +449,7 @@ static void dump_drb_queue_data(unsigned int qno)
 	i = 0;
 	while (i < count) {
 		DPMA_DRB_DATA_INFO("%08X(%04d): %016llX %016llX %016llX %016llX %016llX %016llX %016llX %016llX\n",
-			(u32)data_64ptr, (i * 8),
+			(uintptr_t)data_64ptr, (i * 8),
 			*data_64ptr, *(data_64ptr + 1),
 			*(data_64ptr + 2), *(data_64ptr + 3),
 			*(data_64ptr + 4), *(data_64ptr + 5),
@@ -463,7 +462,7 @@ static void dump_drb_queue_data(unsigned int qno)
 	if (mod64 > 0) {
 		data_8ptr = (u8 *)data_64ptr;
 
-		DPMA_DRB_DATA_INFO("%08X(%04d):", (u32)data_8ptr, count * 8);
+		DPMA_DRB_DATA_INFO("%08X(%04d):", (uintptr_t)data_8ptr, count * 8);
 
 		for (i = 0; i < mod64; i++) {
 			if ((i % 8) == 0)
@@ -2483,7 +2482,6 @@ static int dpmaif_wait_resume_done(void)
 			CCCI_NORMAL_LOG(-1, TAG,
 				"[%s] warning: suspend_flag = 1; (cnt: %d)",
 				__func__, cnt);
-			pm_system_wakeup();
 			return -1;
 		}
 	}
@@ -2760,12 +2758,6 @@ static void record_drb_skb(unsigned char q_num, unsigned short cur_idx,
 	unsigned int *temp;
 #endif
 
-	if (drb_skb == NULL) {
-		CCCI_ERROR_LOG(dpmaif_ctrl->md_id, TAG,
-			"%s idx=%u,drb_skb is NULL\n", __func__, cur_idx);
-		return;
-	}
-
 	drb_skb->skb = skb;
 	drb_skb->phy_addr = phy_addr;
 	drb_skb->data_len = data_len;
@@ -2810,6 +2802,8 @@ static inline int cs_type(struct sk_buff *skb)
 			skb->ip_summed);
 		return 0;
 	} else if (packet_type == IPV4_VERSION) {
+		if (iph->check == 0)
+			return 0; /* No HW check sum */
 		if (skb->ip_summed == CHECKSUM_NONE ||
 			skb->ip_summed == CHECKSUM_UNNECESSARY ||
 			skb->ip_summed == CHECKSUM_COMPLETE)
@@ -3648,7 +3642,6 @@ static int dpmaif_rxq_init(struct dpmaif_rx_queue *queue)
 static int dpmaif_tx_buf_init(struct dpmaif_tx_queue *txq)
 {
 	int ret = 0;
-	unsigned int retry;
 
 	/* DRB buffer init */
 	txq->drb_size_cnt = DPMAIF_UL_DRB_ENTRY_SIZE;
@@ -3674,22 +3667,14 @@ static int dpmaif_tx_buf_init(struct dpmaif_tx_queue *txq)
 		return LOW_MEMORY_DRB;
 	}
 	memset(txq->drb_base, 0, DPMAIF_UL_DRB_SIZE);
-
 	/* alloc buffer for AP SW */
-	for (retry = 0; retry < 5; retry++) {
-		txq->drb_skb_base =
-			kzalloc((txq->drb_size_cnt * sizeof(struct dpmaif_drb_skb)),
-			GFP_KERNEL|__GFP_RETRY_MAYFAIL);
-		if (txq->drb_skb_base)
-			break;
-		CCCI_ERROR_LOG(-1, TAG, "alloc txq->drb_skb_base fail %u\n", retry);
-	}
-
+	txq->drb_skb_base =
+		kzalloc((txq->drb_size_cnt * sizeof(struct dpmaif_drb_skb)),
+				GFP_KERNEL);
 	if (!txq->drb_skb_base) {
 		CCCI_ERROR_LOG(-1, TAG, "drb skb buffer request fail\n");
 		return LOW_MEMORY_DRB;
 	}
-
 	return ret;
 }
 
@@ -3804,11 +3789,13 @@ int dpmaif_late_init(unsigned char hif_id)
 			dpmaif_ctrl->dpmaif_irq_id, ret);
 		return ret;
 	}
+#ifdef MT6297
 	ret = irq_set_irq_wake(dpmaif_ctrl->dpmaif_irq_id, 1);
 	if (ret)
 		CCCI_ERROR_LOG(dpmaif_ctrl->md_id, TAG,
 			"irq_set_irq_wake dpmaif irq(%d) error %d\n",
 			dpmaif_ctrl->dpmaif_irq_id, ret);
+#endif
 	atomic_set(&dpmaif_ctrl->dpmaif_irq_enabled, 1); /* init */
 	dpmaif_disable_irq(dpmaif_ctrl);
 
@@ -3834,9 +3821,7 @@ int dpmaif_late_init(unsigned char hif_id)
 	for (i = 0; i < DPMAIF_RXQ_NUM; i++) {
 		rx_q = &dpmaif_ctrl->rxq[i];
 		rx_q->index = i;
-		ret = dpmaif_rxq_init(rx_q);
-		if (ret < 0)
-			return ret;
+		dpmaif_rxq_init(rx_q);
 		rx_q->skb_idx = -1;
 	}
 
@@ -3852,9 +3837,7 @@ int dpmaif_late_init(unsigned char hif_id)
 	for (i = 0; i < DPMAIF_TXQ_NUM; i++) {
 		tx_q = &dpmaif_ctrl->txq[i];
 		tx_q->index = i;
-		ret = dpmaif_txq_init(tx_q);
-		if (ret < 0)
-			return ret;
+		dpmaif_txq_init(tx_q);
 	}
 
 	/* wakeup source init */
@@ -4336,9 +4319,11 @@ void dpmaif_hw_reset(unsigned char md_id)
 
 	/* pre- DPMAIF HW reset: bus-protect */
 #ifdef MT6297
+	//#ifdef OPLUS_BUG_COMPATIBILITY
 	reg_value = ccci_read32(infra_ao_mem_base, 0);
 	reg_value &= ~INFRA_PROT_DPMAIF_BIT;
 	ccci_write32(infra_ao_mem_base, 0, reg_value);
+	//#endif OPLUS_BUG_COMPATIBILITY
 	CCCI_REPEAT_LOG(md_id, TAG, "%s:set prot:0x%x\n", __func__, reg_value);
 #else
 	regmap_write(dpmaif_ctrl->plat_val.infra_ao_base,
@@ -4914,5 +4899,3 @@ module_exit(ccci_hif_dpmaif_exit);
 MODULE_AUTHOR("ccci");
 MODULE_DESCRIPTION("ccci hif dpmaif driver");
 MODULE_LICENSE("GPL");
-
-
