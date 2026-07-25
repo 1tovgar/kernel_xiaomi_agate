@@ -769,7 +769,7 @@ static int mode_switch(struct drm_panel *panel, unsigned int cur_mode,
 		unsigned int dst_mode, enum MTK_PANEL_MODE_SWITCH_STAGE stage)
 {
 	int ret = 0;
-	struct lcm *ctx;
+	struct lcm __maybe_unused *ctx;
 	if (!panel) {
 		pr_err("invalid params\n");
 		return -EAGAIN;

@@ -818,7 +818,7 @@ int disp_ccorr_set_color_matrix(struct mtk_ddp_comp *comp,
 	int i, j;
 	int ccorr_without_gamma = 0;
 	bool need_refresh = false;
-	bool identity_matrix = true;
+	bool __maybe_unused identity_matrix = true;
 	int id = index_of_ccorr(comp->id);
 #if !defined(CONFIG_DRM_PANEL_K10A_36_02_0A_DSC_VDO) && !defined(CONFIG_DRM_PANEL_K10A_42_02_0B_DSC_VDO) && !defined(CONFIG_DRM_PANEL_K11T_42_02_0A_DSC_CMD)
 	struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
@@ -1096,7 +1096,7 @@ int mtk_drm_ioctl_support_color_matrix(struct drm_device *dev, void *data,
 {
 	int ret = 0;
 	struct DISP_COLOR_TRANSFORM *color_transform;
-	bool support_matrix = true;
+	bool __maybe_unused support_matrix = true;
 	int i;
 
 	if (data == NULL) {

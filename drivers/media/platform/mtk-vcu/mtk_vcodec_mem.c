@@ -84,7 +84,7 @@ void *mtk_vcu_set_buffer(struct mtk_vcu_queue *vcu_queue,
 	unsigned int buffer;
 	dma_addr_t *dma_addr = NULL;
 	struct dma_buf *dbuf = NULL;
-	int op;
+	int __maybe_unused op;
 
 	mutex_lock(&vcu_queue->mmap_lock);
 	pr_debug("[%s] %d iova = %llx src_vb = %p dst_vb = %p\n",

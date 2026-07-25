@@ -1749,7 +1749,7 @@ static bool compr_l_config_PVRIC_V3_1(struct mtk_ddp_comp *comp,
 	unsigned int buf_addr;
 	unsigned int src_buf_tile_num = 0;
 	unsigned int buf_size = 0;
-	unsigned int buf_total_size = 0;
+	unsigned int __maybe_unused buf_total_size = 0;
 
 	/* variable to config into register */
 	unsigned int lx_fbdc_en;
@@ -2098,7 +2098,7 @@ static bool compr_l_config_AFBC_V1_2(struct mtk_ddp_comp *comp,
 	unsigned int buf_addr;
 	unsigned int src_buf_tile_num = 0;
 	unsigned int buf_size = 0;
-	unsigned int buf_total_size = 0;
+	unsigned int __maybe_unused buf_total_size = 0;
 
 
 	/* variable to config into register */
@@ -2919,7 +2919,7 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		break;
 	}
 	case PMQOS_UPDATE_BW: {
-		struct drm_crtc *crtc;
+		struct drm_crtc __maybe_unused *crtc;
 		struct mtk_drm_crtc *mtk_crtc;
 		struct cmdq_pkt_buffer *cmdq_buf;
 		u32 slot_num;

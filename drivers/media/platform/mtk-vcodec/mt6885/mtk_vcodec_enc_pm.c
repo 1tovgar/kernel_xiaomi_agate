@@ -767,7 +767,7 @@ void mtk_venc_pmqos_end_frame(struct mtk_vcodec_ctx *ctx, int core_id)
 struct temp_job *mtk_venc_queue_job(struct mtk_vcodec_ctx *ctx, int core_id,
 				int job_cnt)
 {
-	int cnt = 0;
+	int __maybe_unused cnt = 0;
 	struct temp_job *job = new_job_from_info(ctx, core_id);
 
 	if (job != 0)
