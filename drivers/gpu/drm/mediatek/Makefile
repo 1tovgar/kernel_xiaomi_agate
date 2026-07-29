@@ -1,4 +1,4 @@
-subdir-ccflags-y += -Werror
+subdir-ccflags-y += -Werror -Wno-unused-but-set-variable
 
 mediatek-drm-y := mtk_drm_drv.o \
 		  mtk_disp_color.o \
