@@ -44,7 +44,7 @@ int ishasCalibed = 0;
 #define DEFAULT_MAX_BRIGHTNESS_CLONE 8191
 #define DEFAULT_MAX_BRIGHTNESS  2047
 
-extern void mipi_dsi_dcs_write_gce2(struct mtk_dsi *dsi, struct cmdq_pkt *dummy,
+extern void mipi_dsi_dcs_write_gce(struct mtk_dsi *dsi, struct cmdq_pkt *dummy,
 					  const void *data, size_t len);
 
 bool is_backlight_set_skip(struct mtk_dsi *dsi, u32 bl_lvl)
@@ -1980,9 +1980,9 @@ int mi_dsi_panel_set_disp_param(struct mtk_dsi *dsi, struct disp_feature_ctl *ct
 				mutex_lock(&private->commit.lock);
 			mtk_drm_idlemgr_kick(__func__, dsi->encoder.crtc, 0);
 			if (ctl->feature_val == DOZE_TO_NORMAL) {
-				panel_ext->funcs->doze_disable(dsi->panel, dsi, mipi_dsi_dcs_write_gce2, NULL);
+				panel_ext->funcs->doze_disable(dsi->panel, dsi, mipi_dsi_dcs_write_gce, NULL);
 			} else {
-				panel_ext->funcs->doze_enable(dsi->panel, dsi, mipi_dsi_dcs_write_gce2, NULL);
+				panel_ext->funcs->doze_enable(dsi->panel, dsi, mipi_dsi_dcs_write_gce, NULL);
 			}
 			if (private)
 				mutex_unlock(&private->commit.lock);
@@ -2226,6 +2226,8 @@ exit:
 	mutex_unlock(&dsi->dsi_lock);
 	return rc;
 }
+
+
 
 ssize_t mi_dsi_panel_get_disp_param(struct mtk_dsi *dsi,
 			char *buf, size_t size)

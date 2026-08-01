@@ -258,8 +258,6 @@ static struct LCM_setting_table bist_init_setting[] = {
 		lcm_dcs_write(ctx, d, ARRAY_SIZE(d));                      \
 	})
 
-extern bool get_dsi_doze_state(void);
-
 #ifdef PANEL_SUPPORT_READBACK
 
 static int lcm_dcs_read(struct lcm *ctx, u8 cmd, void *data, size_t len)
@@ -776,14 +774,13 @@ static int mode_switch(struct drm_panel *panel, unsigned int cur_mode,
 	}
 
 	ctx = panel_to_lcm(panel);
-	if (!get_dsi_doze_state()) {
-		if (cur_mode == 0 && dst_mode == 1) { /* 60 switch to 120 */
-			mode_switch_60_to_120(panel, stage);
-		} else if (cur_mode == 1 && dst_mode == 0) { /* 120 switch to 60 */
-			mode_switch_120_to_60(panel, stage);
-		} else
-			ret = 1;
-	}
+	
+	if (cur_mode == 0 && dst_mode == 1) { /* 60 switch to 120 */
+		mode_switch_60_to_120(panel, stage);
+	} else if (cur_mode == 1 && dst_mode == 0) { /* 120 switch to 60 */
+		mode_switch_120_to_60(panel, stage);
+	} else
+		ret = 1;
 	return ret;
 }
 
