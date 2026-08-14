@@ -17,6 +17,9 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
+#include <net/sch_generic.h>
+#include <linux/ip.h>
+#include <linux/ktime.h>
 #include <linux/string_helpers.h>
 #include <linux/usb/composite.h>
 
@@ -83,41 +86,6 @@ static inline int qlen(struct usb_gadget *gadget, unsigned qmult)
 }
 
 /*-------------------------------------------------------------------------*/
-
-/* REVISIT there must be a better way than having two sets
- * of debug calls ...
- */
-
-#undef DBG
-#undef VDBG
-#undef ERROR
-#undef INFO
-
-#define xprintk(d, level, fmt, args...) \
-	printk(level "%s: " fmt , (d)->net->name , ## args)
-
-#ifdef DEBUG
-#undef DEBUG
-#define DBG(dev, fmt, args...) \
-	xprintk(dev , KERN_DEBUG , fmt , ## args)
-#else
-#define DBG(dev, fmt, args...) \
-	do { } while (0)
-#endif /* DEBUG */
-
-#ifdef VERBOSE_DEBUG
-#define VDBG	DBG
-#else
-#define VDBG(dev, fmt, args...) \
-	do { } while (0)
-#endif /* DEBUG */
-
-#define ERROR(dev, fmt, args...) \
-	xprintk(dev , KERN_ERR , fmt , ## args)
-#define INFO(dev, fmt, args...) \
-	xprintk(dev , KERN_INFO , fmt , ## args)
-
-/*-------------------------------------------------------------------------*/
 unsigned int rndis_test_last_resp_id;
 unsigned int rndis_test_last_msg_id;
 EXPORT_SYMBOL_GPL(rndis_test_last_msg_id);
@@ -159,10 +127,10 @@ static void eth_get_drvinfo(struct net_device *net, struct ethtool_drvinfo *p)
 {
 	struct eth_dev *dev = netdev_priv(net);
 
-	strlcpy(p->driver, "g_ether", sizeof(p->driver));
-	strlcpy(p->version, UETH__VERSION, sizeof(p->version));
-	strlcpy(p->fw_version, dev->gadget->name, sizeof(p->fw_version));
-	strlcpy(p->bus_info, dev_name(&dev->gadget->dev), sizeof(p->bus_info));
+	strscpy(p->driver, "g_ether", sizeof(p->driver));
+	strscpy(p->version, UETH__VERSION, sizeof(p->version));
+	strscpy(p->fw_version, dev->gadget->name, sizeof(p->fw_version));
+	strscpy(p->bus_info, dev_name(&dev->gadget->dev), sizeof(p->bus_info));
 }
 
 /* REVISIT can also support:
@@ -1147,9 +1115,12 @@ struct eth_dev *gether_setup_name(struct usb_gadget *g,
 	} else {
 		net->addr_assign_type = NET_ADDR_SET;
 	}
-	if (get_ether_addr(host_addr, dev->host_mac))
-		dev_warn(&g->dev,
-			"using random %s ethernet address\n", "host");
+
+	ether_addr_copy(dev->host_mac, a);
+	pr_debug("%s, rndis: %x:%x:%x:%x:%x:%x\n", __func__,
+		   dev->host_mac[0], dev->host_mac[1],
+		   dev->host_mac[2], dev->host_mac[3],
+		   dev->host_mac[4], dev->host_mac[5]);
 
 	if (ethaddr)
 		memcpy(ethaddr, dev->host_mac, ETH_ALEN);
@@ -1335,6 +1306,8 @@ int gether_get_host_addr_cdc(struct net_device *net, char *host_addr, int len)
 
 	dev = netdev_priv(net);
 	snprintf(host_addr, len, "%pm", dev->host_mac);
+
+	string_upper(host_addr, host_addr);
 
 	return strlen(host_addr);
 }
@@ -1534,6 +1507,10 @@ void gether_disconnect(struct gether *link)
 	rndis_test_tx_usb_out = 0;
 	rndis_test_tx_complete = 0;
 
+	spin_lock(&dev->lock);
+	dev->port_usb = NULL;
+	spin_unlock(&dev->lock);
+
 	netif_stop_queue(dev->net);
 	netif_carrier_off(dev->net);
 
@@ -1583,10 +1560,6 @@ void gether_disconnect(struct gether *link)
 	dev->header_len = 0;
 	dev->unwrap = NULL;
 	dev->wrap = NULL;
-
-	spin_lock(&dev->lock);
-	dev->port_usb = NULL;
-	spin_unlock(&dev->lock);
 }
 EXPORT_SYMBOL_GPL(gether_disconnect);
 
