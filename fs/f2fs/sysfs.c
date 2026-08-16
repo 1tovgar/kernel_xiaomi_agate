@@ -45,6 +45,7 @@ struct f2fs_attr {
 			 const char *, size_t);
 	int struct_type;
 	int offset;
+	int size;
 	int id;
 };
 
@@ -233,7 +234,7 @@ static ssize_t avg_vblocks_show(struct f2fs_attr *a,
 	si->dirty_count = dirty_segments(sbi);
 	f2fs_update_sit_info(sbi);
 	return sprintf(buf, "%llu\n", (unsigned long long)(si->avg_vblocks));
-}
+	}
 #endif
 
 static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
@@ -557,19 +558,21 @@ static ssize_t f2fs_feature_show(struct f2fs_attr *a,
 	return 0;
 }
 
-#define F2FS_ATTR_OFFSET(_struct_type, _name, _mode, _show, _store, _offset) \
+#define F2FS_ATTR_OFFSET(_struct_type, _name, _mode, _show, _store, _offset, _size) \
 static struct f2fs_attr f2fs_attr_##_name = {			\
 	.attr = {.name = __stringify(_name), .mode = _mode },	\
 	.show	= _show,					\
 	.store	= _store,					\
 	.struct_type = _struct_type,				\
-	.offset = _offset					\
+	.offset = _offset,					\
+	.size = _size						\
 }
 
 #define F2FS_RW_ATTR(struct_type, struct_name, name, elname)	\
 	F2FS_ATTR_OFFSET(struct_type, name, 0644,		\
 		f2fs_sbi_show, f2fs_sbi_store,			\
-		offsetof(struct struct_name, elname))
+		offsetof(struct struct_name, elname),		\
+		sizeof_field(struct struct_name, elname))
 
 #define F2FS_GENERAL_RO_ATTR(name) \
 static struct f2fs_attr f2fs_attr_##name = __ATTR(name, 0444, name##_show, NULL)
