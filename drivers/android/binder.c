@@ -2641,14 +2641,8 @@ static void binder_transaction(struct binder_proc *proc,
 	e->target_handle = tr->target.handle;
 	e->data_size = tr->data_size;
 	e->offsets_size = tr->offsets_size;
-	e->context_name = proc->context->name;
-#ifdef CONFIG_ANDROID_BINDER_USER_TRACKING
-	ktime_get_ts(&e->timestamp);
-	/* monotonic_to_bootbased(&e->timestamp); */
-	do_gettimeofday(&e->tv);
-	/* consider time zone. translate to android time */
-	e->tv.tv_sec -= (sys_tz.tz_minuteswest * 60);
-#endif
+	strscpy(e->context_name, proc->context->name, BINDERFS_MAX_NAME);
+
 	if (reply) {
 		binder_inner_proc_lock(proc);
 		in_reply_to = thread->transaction_stack;
@@ -5920,7 +5914,8 @@ err_init_binder_device_failed:
 
 err_alloc_device_names_failed:
 	debugfs_remove_recursive(binder_debugfs_dir_entry_root);
-	
+	binder_alloc_shrinker_exit();
+
 	return ret;
 }
 
