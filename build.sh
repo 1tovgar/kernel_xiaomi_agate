@@ -2,11 +2,11 @@
 set -e 
 
 AOSP_ROOT="/android/eos-a16"
-CLANG_BIN="${AOSP_ROOT}/prebuilts/clang/host/linux-x86/clang-r433403b/bin"
+CLANG_BIN="${AOSP_ROOT}/prebuilts/clang/host/linux-x86/clang-r450784d/bin"
 GCC_BIN="${AOSP_ROOT}/prebuilts/gcc/linux-x86/aarch64/aarch64-none-linux-gnu/bin"
 
 export PATH="${CLANG_BIN}:${GCC_BIN}:${PATH}"
-export LD_LIBRARY_PATH="${AOSP_ROOT}/prebuilts/clang/host/linux-x86/clang-r433403b/lib64:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${AOSP_ROOT}/prebuilts/clang/host/linux-x86/clang-r450784d/lib:${LD_LIBRARY_PATH}"
 
 export ARCH=arm64
 export SUBARCH=arm64
