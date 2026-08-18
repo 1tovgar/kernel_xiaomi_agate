@@ -466,7 +466,10 @@ struct power_supply *power_supply_get_by_name(const char *name)
 
 	if (dev) {
 		psy = dev_get_drvdata(dev);
-		atomic_inc(&psy->use_cnt);
+		if (atomic_read(&psy->use_cnt) >= 1)
+			atomic_inc(&psy->use_cnt);
+		else
+			psy = NULL;
 	}
 
 	return psy;
@@ -482,6 +485,15 @@ EXPORT_SYMBOL_GPL(power_supply_get_by_name);
  */
 void power_supply_put(struct power_supply *psy)
 {
+	int uses_open = atomic_read(&psy->use_cnt);
+
+	if (uses_open <= 1) {
+		atomic_set(&psy->use_cnt, 0);
+		pr_err("power_supply_put: called while use_cnt %d\n",
+			uses_open);
+		return;
+	}
+
 	atomic_dec(&psy->use_cnt);
 	put_device(&psy->dev);
 }
@@ -650,7 +662,8 @@ int power_supply_set_property(struct power_supply *psy,
 	if (!psy)
                return -ENODEV;
 
-	if (atomic_read(&psy->use_cnt) <= 0 || !psy->desc->set_property)
+	if (!psy || atomic_read(&psy->use_cnt) <= 0 ||
+	    !psy->desc || !psy->desc->set_property)
 		return -ENODEV;
 
 	return psy->desc->set_property(psy, psp, val);
@@ -660,8 +673,8 @@ EXPORT_SYMBOL_GPL(power_supply_set_property);
 int power_supply_property_is_writeable(struct power_supply *psy,
 					enum power_supply_property psp)
 {
-	if (atomic_read(&psy->use_cnt) <= 0 ||
-			!psy->desc->property_is_writeable)
+	if (!psy || atomic_read(&psy->use_cnt) <= 0 ||
+	    !psy->desc || !psy->desc->property_is_writeable)
 		return -ENODEV;
 
 	return psy->desc->property_is_writeable(psy, psp);
@@ -670,8 +683,8 @@ EXPORT_SYMBOL_GPL(power_supply_property_is_writeable);
 
 void power_supply_external_power_changed(struct power_supply *psy)
 {
-	if (atomic_read(&psy->use_cnt) <= 0 ||
-			!psy->desc->external_power_changed)
+	if (!psy || atomic_read(&psy->use_cnt) <= 0 ||
+	    !psy->desc || !psy->desc->external_power_changed)
 		return;
 
 	psy->desc->external_power_changed(psy);
@@ -1098,7 +1111,18 @@ EXPORT_SYMBOL_GPL(devm_power_supply_register_no_ws);
  */
 void power_supply_unregister(struct power_supply *psy)
 {
-	WARN_ON(atomic_dec_return(&psy->use_cnt));
+	unsigned int uses_open = atomic_read(&psy->use_cnt);
+
+	if (uses_open > 1) {
+		atomic_set(&psy->use_cnt, 0);
+		pr_err("power_supply_unregister: called while use_cnt %d\n",
+			uses_open);
+		while (uses_open > 1) {
+			put_device(&psy->dev);
+			uses_open--;
+		}
+	} else
+		WARN_ON(atomic_dec_return(&psy->use_cnt));
 	psy->removing = true;
 	cancel_work_sync(&psy->changed_work);
 	cancel_delayed_work_sync(&psy->deferred_register_work);
