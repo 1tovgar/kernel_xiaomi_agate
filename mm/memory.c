@@ -2672,6 +2672,7 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 	 */
 	if (PageAnon(vmf->page)) {
 		struct page *page = vmf->page;
+		int total_map_swapcount;
 
 		if (!trylock_page(vmf->page)) {
 			get_page(vmf->page);

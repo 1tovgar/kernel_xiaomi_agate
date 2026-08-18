@@ -1400,6 +1400,7 @@ extern void show_free_areas(unsigned int flags, nodemask_t *nodemask);
 extern bool can_do_mlock(void);
 extern int user_shm_lock(size_t, struct user_struct *);
 extern void user_shm_unlock(size_t, struct user_struct *);
+extern void show_task_mem(void);
 
 /*
  * Parameter block passed down to zap_pte_range in exceptional cases.
@@ -2949,20 +2950,6 @@ void __init setup_nr_node_ids(void);
 static inline void setup_nr_node_ids(void) {}
 #endif
 
-extern unsigned long reclaim_global(unsigned long nr_to_reclaim);
-extern int reclaim_pte_range(pmd_t *pmd, unsigned long addr,
-				unsigned long end, struct mm_walk *walk);
-#ifdef CONFIG_RTMM
-struct reclaim_param {
-	struct vm_area_struct *vma;
-	/* Number of pages scanned */
-	int nr_scanned;
-	/* max pages to reclaim */
-	int nr_to_reclaim;
-	/* pages reclaimed */
-	int nr_reclaimed;
-};
-#endif
-
+extern int want_old_faultaround_pte;
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */
